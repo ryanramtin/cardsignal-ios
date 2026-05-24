@@ -29,7 +29,7 @@ final class PHashMatcher {
         let dctBlock = dct2D(pixels, size: dctSize)
         let topLeft = extract8x8(dctBlock, fullSize: dctSize)
 
-        let mean = topLeft.reduce(0, +) / Double(topLeft.count)
+        let mean = topLeft.reduce(0, +) / Float(topLeft.count)
 
         var hash: UInt64 = 0
         for (i, val) in topLeft.enumerated() {
@@ -64,7 +64,7 @@ final class PHashMatcher {
         ]))
     }
 
-    private func pixelValues(from image: UIImage) -> [Double]? {
+    private func pixelValues(from image: UIImage) -> [Float]? {
         guard let cgImage = image.cgImage else { return nil }
         let width = cgImage.width
         let height = cgImage.height
@@ -80,42 +80,43 @@ final class PHashMatcher {
         ) else { return nil }
 
         ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-        return pixels.map { Double($0) }
+        // vDSP DCT works with Float; convert from UInt8 pixel bytes
+        return pixels.map { Float($0) }
     }
 
-    // MARK: - 2D DCT (separable, using vDSP)
+    // MARK: - 2D DCT (separable, using vDSP — Float only)
 
-    private func dct2D(_ pixels: [Double], size: Int) -> [Double] {
+    private func dct2D(_ pixels: [Float], size: Int) -> [Float] {
         var result = pixels
         let n = vDSP_Length(size)
+        guard let setup = vDSP_DCT_CreateSetup(nil, n, .II) else { return result }
+        defer { vDSP_DFT_DestroySetup(setup) }
 
-        // Row-wise DCT
+        // Row-wise DCT (separate input/output buffers — vDSP requires exclusive access)
         result.withUnsafeMutableBufferPointer { buf in
             for row in 0..<size {
-                var rowData = Array(buf[row * size ..< (row + 1) * size])
-                vDSP_DCT_Execute(makeDCTSetup(n: n)!, &rowData, &rowData)
-                for col in 0..<size { buf[row * size + col] = rowData[col] }
+                let input = Array(buf[row * size ..< (row + 1) * size])
+                var output = [Float](repeating: 0, count: size)
+                vDSP_DCT_Execute(setup, input, &output)
+                for col in 0..<size { buf[row * size + col] = output[col] }
             }
         }
 
         // Column-wise DCT
         result.withUnsafeMutableBufferPointer { buf in
             for col in 0..<size {
-                var colData = (0..<size).map { buf[$0 * size + col] }
-                vDSP_DCT_Execute(makeDCTSetup(n: n)!, &colData, &colData)
-                for row in 0..<size { buf[row * size + col] = colData[row] }
+                let input = (0..<size).map { buf[$0 * size + col] }
+                var output = [Float](repeating: 0, count: size)
+                vDSP_DCT_Execute(setup, input, &output)
+                for row in 0..<size { buf[row * size + col] = output[row] }
             }
         }
 
         return result
     }
 
-    private func makeDCTSetup(n: vDSP_Length) -> OpaquePointer? {
-        vDSP_DCT_CreateSetup(nil, n, .II)
-    }
-
-    private func extract8x8(_ block: [Double], fullSize: Int) -> [Double] {
-        var result = [Double]()
+    private func extract8x8(_ block: [Float], fullSize: Int) -> [Float] {
+        var result = [Float]()
         result.reserveCapacity(hashSize * hashSize)
         for row in 0..<hashSize {
             for col in 0..<hashSize {

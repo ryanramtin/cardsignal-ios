@@ -9,12 +9,15 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var error: String?
     @Published var permissionGranted = false
 
-    let session = AVCaptureSession()
+    // nonisolated(unsafe): AVCaptureSession is thread-safe for start/stop;
+    // we never mutate the reference itself after init.
+    nonisolated(unsafe) let session = AVCaptureSession()
     private let photoOutput = AVCapturePhotoOutput()
     private var videoOutput: AVCaptureVideoDataOutput?
 
-    // Callback for when a frame is ready for analysis
-    var onFrameReady: ((CVPixelBuffer) -> Void)?
+    // Stored nonisolated so the video-queue delegate can call it without
+    // crossing actor boundaries. The closure itself must be concurrency-safe.
+    nonisolated(unsafe) var onFrameReady: ((CVPixelBuffer) -> Void)?
 
     override init() {
         super.init()
@@ -71,14 +74,17 @@ final class CameraViewModel: NSObject, ObservableObject {
     }
 
     func startSession() {
-        Task.detached(priority: .userInitiated) { [weak self] in
-            self?.session.startRunning()
+        // Capture session ref locally — safe because session is nonisolated(unsafe)
+        let captureSession = session
+        Task.detached(priority: .userInitiated) {
+            captureSession.startRunning()
         }
     }
 
     func stopSession() {
-        Task.detached(priority: .background) { [weak self] in
-            self?.session.stopRunning()
+        let captureSession = session
+        Task.detached(priority: .background) {
+            captureSession.stopRunning()
         }
     }
 
