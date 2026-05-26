@@ -1,0 +1,22 @@
+# Xcode per-user state
+**/xcuserdata/
+**/*.xcuserstate
+
+# Build output
+build/
+DerivedData/
+
+# CocoaPods (we don't use it, but in case)
+Pods/
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
