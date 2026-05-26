@@ -18,6 +18,7 @@
 		89CECBB5CA1F2531C6EE7BE1 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 168643EE07FF4E26C17F9752 /* RevenueCat */; };
 		8B412E2189A0455B269AF4B3 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17495AF4E04401D63849A395 /* CameraView.swift */; };
 		8BCBA1836906F5795678850F /* CardIdentificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60939FBEE80CFE9C48300782 /* CardIdentificationService.swift */; };
+		B4CC4CF19288ADAAAE352C0C /* RealCardScanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 892CA6827B07F77647E220E5 /* RealCardScanTests.swift */; };
 		B827EE6B95F3C6E92323518D /* CardDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8715E4717B3B8A23A4182 /* CardDetailView.swift */; };
 		CA0DEBD7E4F139B49C1ED9AB /* CameraViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D344A4D1A0AC7FAE25445B9D /* CameraViewModel.swift */; };
 		CCE5B982F728D4AA5BAF5A5B /* CardSignalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B162C90E555CF547FF13588F /* CardSignalTests.swift */; };
@@ -28,6 +29,7 @@
 		F80271142FDAB33DC8B1C0A5 /* PHashMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ADC79BDA023AEF589F14D76 /* PHashMatcher.swift */; };
 		F970C4D0AD59457EDF313EA0 /* ScanFlowSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23AED91678A757EDEEE2400F /* ScanFlowSmokeTests.swift */; };
 		FEBD2449A9F8BDB78F4B94FE /* PriceHistoryChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85BD5E7693252C294BC57E13 /* PriceHistoryChart.swift */; };
+		FF6E8575553B7EAA0FCA2487 /* Resources in Resources */ = {isa = PBXBuildFile; fileRef = A6D275F5D35EB3F64816831B /* Resources */; };
 		FF97D2C19B9E5E31A3E96C36 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FEFB14829FD42D1B829340 /* ContentView.swift */; };
 /* End PBXBuildFile section */
 
@@ -54,7 +56,9 @@
 		71419CC703C4295F0C8EDFBF /* RareCheckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RareCheckApp.swift; sourceTree = "<group>"; };
 		7C475F2287A031D1F4A339BF /* OCRService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRService.swift; sourceTree = "<group>"; };
 		85BD5E7693252C294BC57E13 /* PriceHistoryChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PriceHistoryChart.swift; sourceTree = "<group>"; };
+		892CA6827B07F77647E220E5 /* RealCardScanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealCardScanTests.swift; sourceTree = "<group>"; };
 		9C047D88194EF51503DE2D77 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A6D275F5D35EB3F64816831B /* Resources */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Resources; path = RareCheckTests/Resources; sourceTree = SOURCE_ROOT; };
 		A6FEFB14829FD42D1B829340 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B162C90E555CF547FF13588F /* CardSignalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardSignalTests.swift; sourceTree = "<group>"; };
 		B4349E1420EE43A542F7F2CC /* RareCheck.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RareCheck.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -84,6 +88,8 @@
 			isa = PBXGroup;
 			children = (
 				B162C90E555CF547FF13588F /* CardSignalTests.swift */,
+				892CA6827B07F77647E220E5 /* RealCardScanTests.swift */,
+				A6D275F5D35EB3F64816831B /* Resources */,
 				23AED91678A757EDEEE2400F /* ScanFlowSmokeTests.swift */,
 			);
 			path = RareCheckTests;
@@ -217,6 +223,7 @@
 			buildConfigurationList = CE764842916288DAD15B6267 /* Build configuration list for PBXNativeTarget "RareCheckTests" */;
 			buildPhases = (
 				A638B08CEA7508AFA200FADD /* Sources */,
+				D69B55D8FFAFECDEE4B61309 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -299,6 +306,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D69B55D8FFAFECDEE4B61309 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FF6E8575553B7EAA0FCA2487 /* Resources in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -332,6 +347,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CCE5B982F728D4AA5BAF5A5B /* CardSignalTests.swift in Sources */,
+				B4CC4CF19288ADAAAE352C0C /* RealCardScanTests.swift in Sources */,
 				F970C4D0AD59457EDF313EA0 /* ScanFlowSmokeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

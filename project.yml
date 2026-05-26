@@ -60,7 +60,12 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources:
-      - RareCheckTests
+      - path: RareCheckTests
+        excludes:
+          - "Resources/**"
+      - path: RareCheckTests/Resources
+        type: folder
+        buildPhase: resources
     settings:
       GENERATE_INFOPLIST_FILE: YES
       PRODUCT_BUNDLE_IDENTIFIER: app.rarecheck.ios.tests
