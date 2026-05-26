@@ -1,6 +1,7 @@
 import XCTest
 @testable import RareCheck
 
+@MainActor
 final class RareCheckTests: XCTestCase {
 
     // MARK: - OCR Tests

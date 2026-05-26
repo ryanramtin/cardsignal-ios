@@ -15,7 +15,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "E4E9B78AD521CE9655BAD614"
+               BlueprintIdentifier = "8537182D70289CA9EC8435BE"
                BuildableName = "RareCheck.app"
                BlueprintName = "RareCheck"
                ReferencedContainer = "container:RareCheck.xcodeproj">
@@ -32,7 +32,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "E4E9B78AD521CE9655BAD614"
+            BlueprintIdentifier = "8537182D70289CA9EC8435BE"
             BuildableName = "RareCheck.app"
             BlueprintName = "RareCheck"
             ReferencedContainer = "container:RareCheck.xcodeproj">
@@ -44,7 +44,7 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "0C46A2ED60A2DAD60E35EC32"
+               BlueprintIdentifier = "6FC40BA8CD994A77BE0B0D80"
                BuildableName = "RareCheckTests.xctest"
                BlueprintName = "RareCheckTests"
                ReferencedContainer = "container:RareCheck.xcodeproj">
@@ -68,7 +68,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "E4E9B78AD521CE9655BAD614"
+            BlueprintIdentifier = "8537182D70289CA9EC8435BE"
             BuildableName = "RareCheck.app"
             BlueprintName = "RareCheck"
             ReferencedContainer = "container:RareCheck.xcodeproj">
@@ -87,7 +87,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "E4E9B78AD521CE9655BAD614"
+            BlueprintIdentifier = "8537182D70289CA9EC8435BE"
             BuildableName = "RareCheck.app"
             BlueprintName = "RareCheck"
             ReferencedContainer = "container:RareCheck.xcodeproj">

@@ -128,11 +128,20 @@ final class PHashMatcher {
 }
 
 extension UIImage {
+    // Apply a CIFilter and render the result back to a cgImage-backed UIImage.
+    // UIImage(ciImage:) produces an image with no cgImage, which downstream
+    // CoreGraphics code (drawing into bitmap contexts) cannot read — silently
+    // returning nil. Always materialize through CIContext.createCGImage.
     func applying(_ filter: CIFilter?) -> UIImage? {
         guard let filter else { return self }
-        guard let ciImage = CIImage(image: self) else { return nil }
-        filter.setValue(ciImage, forKey: kCIInputImageKey)
-        guard let output = filter.outputImage else { return nil }
-        return UIImage(ciImage: output)
+        guard let inputCI = CIImage(image: self) ?? cgImage.map(CIImage.init(cgImage:)) else {
+            return self
+        }
+        filter.setValue(inputCI, forKey: kCIInputImageKey)
+        guard let outputCI = filter.outputImage else { return self }
+        let context = CIContext(options: nil)
+        let extent = outputCI.extent.isInfinite ? inputCI.extent : outputCI.extent
+        guard let cg = context.createCGImage(outputCI, from: extent) else { return self }
+        return UIImage(cgImage: cg, scale: scale, orientation: imageOrientation)
     }
 }

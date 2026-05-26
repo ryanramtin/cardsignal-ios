@@ -13,7 +13,20 @@ final class PersistenceController: ObservableObject {
     static let freeCollectionLimit = 20
 
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "RareCheck")
+        // Load the managed object model explicitly from the main bundle so
+        // CoreData doesn't auto-scan all loaded bundles and find duplicate
+        // entity definitions (which logs "Failed to find a unique match for
+        // an NSEntityDescription to a managed object subclass" warnings
+        // when both the app and test bundles are loaded together).
+        let model: NSManagedObjectModel = {
+            guard let url = Bundle.main.url(forResource: "RareCheck", withExtension: "momd"),
+                  let m = NSManagedObjectModel(contentsOf: url) else {
+                // Fallback: merged model from all bundles (legacy behavior).
+                return NSManagedObjectModel.mergedModel(from: nil) ?? NSManagedObjectModel()
+            }
+            return m
+        }()
+        container = NSPersistentContainer(name: "RareCheck", managedObjectModel: model)
 
         if inMemory {
             container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
@@ -32,11 +45,15 @@ final class PersistenceController: ObservableObject {
         let ctx = container.viewContext
 
         // Check for duplicate
-        let fetchRequest: NSFetchRequest<SavedCard> = SavedCard.fetchRequest()
+        let fetchRequest: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
         fetchRequest.predicate = NSPredicate(format: "cardId == %@", card.id)
         if let existing = try? ctx.fetch(fetchRequest), !existing.isEmpty { return }
 
-        let saved = SavedCard(context: ctx)
+        // Use the entity from our container's model explicitly, so we don't
+        // hit "Failed to find a unique match" warnings if multiple bundles
+        // (app + tests) each register the same model.
+        let entity = NSEntityDescription.entity(forEntityName: "SavedCard", in: ctx)!
+        let saved = SavedCard(entity: entity, insertInto: ctx)
         saved.id = UUID()
         saved.cardId = card.id
         saved.name = card.name
@@ -64,7 +81,7 @@ final class PersistenceController: ObservableObject {
     // MARK: - Collection Count
 
     func collectionCount() -> Int {
-        let req: NSFetchRequest<SavedCard> = SavedCard.fetchRequest()
+        let req: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
         return (try? container.viewContext.count(for: req)) ?? 0
     }
 
@@ -75,7 +92,7 @@ final class PersistenceController: ObservableObject {
     // MARK: - CSV Export (Pro)
 
     func exportCSV() -> String {
-        let req: NSFetchRequest<SavedCard> = SavedCard.fetchRequest()
+        let req: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
         req.sortDescriptors = [NSSortDescriptor(key: "addedAt", ascending: false)]
         let cards = (try? container.viewContext.fetch(req)) ?? []
 

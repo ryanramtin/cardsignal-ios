@@ -58,6 +58,16 @@ struct ScannerContainerView: View {
                 }
             }
             .onDisappear { cameraVM.stopSession() }
+            // Photo capture is async — kick off identification once the
+            // image actually lands in @Published capturedImage, then clear
+            // it so the next shutter tap fires a fresh identify().
+            .onChange(of: cameraVM.capturedImage) { _, newImage in
+                guard let img = newImage else { return }
+                Task {
+                    await scannerVM.identify(image: img)
+                    await MainActor.run { cameraVM.capturedImage = nil }
+                }
+            }
             .sheet(item: $scannerVM.identificationResult) { result in
                 CardMatchResultSheet(result: result, onSave: { card in
                     scannerVM.saveCard(card)
@@ -75,12 +85,11 @@ struct ScannerContainerView: View {
     private var scannerControlsBar: some View {
         HStack(spacing: 32) {
             Spacer()
-            // Capture button
+            // Capture button — identification is triggered by .onChange of
+            // capturedImage above, not synchronously here, because
+            // capturePhoto() is async (delegate fires on the next frame).
             Button {
                 cameraVM.capturePhoto()
-                if let img = cameraVM.capturedImage {
-                    Task { await scannerVM.identify(image: img) }
-                }
             } label: {
                 ZStack {
                     Circle().fill(.white).frame(width: 72, height: 72)
