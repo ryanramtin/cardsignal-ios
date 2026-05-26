@@ -20,6 +20,7 @@ final class CardIdentificationService: ObservableObject {
     private let api = APIClient.shared
 
     private let localConfidenceThreshold: Double = 0.70
+    private let apiConfidenceThreshold: Double = 0.70
     private let ocrWeight: Double = 0.60
     private let hashWeight: Double = 0.40
 
@@ -65,6 +66,8 @@ final class CardIdentificationService: ObservableObject {
         )
         var apiResponse = try await api.identifyCard(imageData: compressed, ocrHints: hints)
 
+        apiResponse = apiResponse.filtered(minConfidence: apiConfidenceThreshold)
+
         if apiResponse.matches.isEmpty {
             for candidate in candidateNames {
                 guard candidate.caseInsensitiveCompare(ocr.name ?? "") != .orderedSame else { continue }
@@ -74,7 +77,9 @@ final class CardIdentificationService: ObservableObject {
                     setCode: ocr.setCode,
                     rawText: nil
                 )
-                let candidateResponse = try await api.identifyCard(imageData: compressed, ocrHints: candidateHints)
+                let candidateResponse = try await api
+                    .identifyCard(imageData: compressed, ocrHints: candidateHints)
+                    .filtered(minConfidence: apiConfidenceThreshold)
                 if !candidateResponse.matches.isEmpty {
                     apiResponse = candidateResponse
                     break
@@ -83,7 +88,7 @@ final class CardIdentificationService: ObservableObject {
         }
 
         guard !apiResponse.matches.isEmpty else {
-            throw CardIdentificationError.noPokemonMatch(candidateNames)
+            throw CardIdentificationError.noConfidentPokemonMatch(candidateNames)
         }
 
         let ms = Int(Date().timeIntervalSince(start) * 1000)
@@ -219,7 +224,19 @@ final class CardIdentificationService: ObservableObject {
         guard cleaned.range(of: #"^(basic|stage\s+\d+|trainer|energy|weakness|resistance|retreat)$"#, options: [.regularExpression, .caseInsensitive]) == nil else {
             return nil
         }
+        guard cleaned.range(of: #"^(basic\s+)?(grass|fire|water|lightning|psychic|fighting|darkness|metal|fairy|dragon)?\s*energy$"#, options: [.regularExpression, .caseInsensitive]) == nil else {
+            return nil
+        }
         return cleaned
+    }
+}
+
+private extension CardIdentifyResponse {
+    func filtered(minConfidence: Double) -> CardIdentifyResponse {
+        CardIdentifyResponse(
+            matches: matches.filter { $0.confidence >= minConfidence },
+            processingTimeMs: processingTimeMs
+        )
     }
 }
 
@@ -342,7 +359,7 @@ extension IdentificationResult: Identifiable {
 enum CardIdentificationError: LocalizedError {
     case noCardDetected
     case noReadableCardText
-    case noPokemonMatch([String])
+    case noConfidentPokemonMatch([String])
 
     var errorDescription: String? {
         switch self {
@@ -350,12 +367,12 @@ enum CardIdentificationError: LocalizedError {
             return "No trading card was captured. Align one card inside the frame until the border turns green, then scan again."
         case .noReadableCardText:
             return "I found a card shape, but couldn't read a Pokemon card name. Move closer, reduce glare, and hold steady until READY."
-        case .noPokemonMatch(let candidates):
+        case .noConfidentPokemonMatch(let candidates):
             let names = candidates.prefix(3).joined(separator: ", ")
             if names.isEmpty {
                 return "No Pokemon database match found. Try moving closer and keeping the card flat in the frame."
             }
-            return "No Pokemon database match found for: \(names). Try moving closer, reducing glare, and centering the card name."
+            return "No confident Pokemon database match found for: \(names). Try moving closer, reducing glare, and centering the card name."
         }
     }
 }
