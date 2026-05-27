@@ -162,7 +162,7 @@ struct ScannerContainerView: View {
         ContentUnavailableView {
             Label("Camera Access Required", systemImage: "camera.fill")
         } description: {
-            Text("RareCheck needs camera access to scan cards.")
+            Text("Poké Rare Check needs camera access to scan cards.")
         } actions: {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {

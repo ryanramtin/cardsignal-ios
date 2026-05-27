@@ -44,31 +44,47 @@ final class PersistenceController: ObservableObject {
     func saveCard(_ card: CardMatch) {
         let ctx = container.viewContext
 
-        // Check for duplicate
+        // Existing saves should be refreshed when the database returns better
+        // metadata later, especially imageURL after an initial fuzzy match.
         let fetchRequest: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
         fetchRequest.predicate = NSPredicate(format: "cardId == %@", card.id)
-        if let existing = try? ctx.fetch(fetchRequest), !existing.isEmpty { return }
+        if let existing = try? ctx.fetch(fetchRequest), let saved = existing.first {
+            apply(card, to: saved, preserveAddedAt: true)
+            try? ctx.save()
+            return
+        }
 
         // Use the entity from our container's model explicitly, so we don't
         // hit "Failed to find a unique match" warnings if multiple bundles
         // (app + tests) each register the same model.
         let entity = NSEntityDescription.entity(forEntityName: "SavedCard", in: ctx)!
         let saved = SavedCard(entity: entity, insertInto: ctx)
-        saved.id = UUID()
+        apply(card, to: saved, preserveAddedAt: false)
+        saved.addedAt = Date()
+
+        try? ctx.save()
+    }
+
+    private func apply(_ card: CardMatch, to saved: SavedCard, preserveAddedAt: Bool) {
+        if saved.id == nil {
+            saved.id = UUID()
+        }
         saved.cardId = card.id
         saved.name = card.name
         saved.setName = card.setName
         saved.setCode = card.setCode
         saved.collectorNumber = card.collectorNumber
         saved.rarity = card.rarity
-        saved.imageURL = card.imageURL
+        if !card.imageURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            saved.imageURL = card.imageURL
+        }
         saved.currentPriceLow = card.price.low
         saved.currentPriceMid = card.price.mid
         saved.currentPriceHigh = card.price.high
         saved.currentPriceMarket = card.price.market
-        saved.addedAt = Date()
-
-        try? ctx.save()
+        if !preserveAddedAt || saved.addedAt == nil {
+            saved.addedAt = Date()
+        }
     }
 
     // MARK: - Delete Card

@@ -57,8 +57,8 @@ struct SettingsView: View {
                 Section("About") {
                     LabeledContent("Version", value: Bundle.main.appVersion)
                     LabeledContent("Build", value: Bundle.main.buildNumber)
-                    Link("Privacy Policy", destination: URL(string: "https://rarecheck.app/privacy")!)
-                    Link("Terms of Service", destination: URL(string: "https://rarecheck.app/terms")!)
+                    Link("Privacy Policy", destination: URL(string: "https://pokerarecheck.com/privacy")!)
+                    Link("Terms of Service", destination: URL(string: "https://pokerarecheck.com/terms")!)
                 }
 
                 Section {

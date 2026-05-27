@@ -59,7 +59,7 @@ struct PaywallView: View {
             }
             .padding(.top, 20)
 
-            Text("RareCheck Pro")
+            Text("Poké Rare Check Pro")
                 .font(.system(size: 32, weight: .black, design: .rounded))
 
             Text("Unlock the full power of your collection")
@@ -183,8 +183,8 @@ struct PaywallView: View {
             .font(.footnote).foregroundStyle(.secondary)
 
             HStack(spacing: 16) {
-                Link("Privacy Policy", destination: URL(string: "https://rarecheck.app/privacy")!)
-                Link("Terms of Service", destination: URL(string: "https://rarecheck.app/terms")!)
+                Link("Privacy Policy", destination: URL(string: "https://pokerarecheck.com/privacy")!)
+                Link("Terms of Service", destination: URL(string: "https://pokerarecheck.com/terms")!)
             }
             .font(.caption).foregroundStyle(.tertiary)
 

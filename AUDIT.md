@@ -1,4 +1,4 @@
-# RareCheck Tech-Director Audit — 2026-05-25
+# Poké Rare Check Tech-Director Audit — 2026-05-25
 
 > Read before touching code. Compares the scaffolded scaffold (commits `08057f5` iOS / `00f14a1` api) against the dual-mode mockups + `DESIGN.md`.
 

@@ -1,4 +1,5 @@
 import XCTest
+import CoreData
 @testable import RareCheck
 
 @MainActor
@@ -59,6 +60,25 @@ final class RareCheckTests: XCTestCase {
         controller.saveCard(match)
         controller.saveCard(match)  // duplicate
         XCTAssertEqual(controller.collectionCount(), 1)
+    }
+
+    func testDuplicateSaveRefreshesPokemonDBImage() throws {
+        let controller = PersistenceController(inMemory: true)
+        let firstPass = CardMatch(id: "xy-026", name: "Fennekin", setName: "XY",
+                                  setCode: "XY", collectorNumber: "26", rarity: "Common",
+                                  imageURL: "", confidence: 0.72, price: .zero)
+        let dbMatch = CardMatch(id: "xy-026", name: "Fennekin", setName: "XY",
+                                setCode: "XY", collectorNumber: "26", rarity: "Common",
+                                imageURL: "https://images.pokemontcg.io/xy1/26_hires.png",
+                                confidence: 0.96, price: .zero)
+
+        controller.saveCard(firstPass)
+        controller.saveCard(dbMatch)
+
+        let request: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
+        let saved = try XCTUnwrap(controller.container.viewContext.fetch(request).first)
+        XCTAssertEqual(controller.collectionCount(), 1)
+        XCTAssertEqual(saved.imageURL, dbMatch.imageURL)
     }
 
     func testFreeLimitEnforcement() {

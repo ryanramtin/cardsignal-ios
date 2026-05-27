@@ -1,4 +1,4 @@
-# Design System: RareCheck
+# Design System: Poké Rare Check
 **Project ID:** rarecheck-ios (no Stitch project yet; synthesized from PNG mockups provided by Ryan on 2026-05-25)
 **Mockups analyzed:**
 - Kid Friendly Mode — 5-screen core flow + notifications + key elements + settings
@@ -7,7 +7,7 @@
 
 ## 1. Visual Theme & Atmosphere
 
-RareCheck is a **dual-personality** product wearing one coherent visual identity. Both modes share the same paper-toned background, the same generously rounded geometry, and the same Pokémon-character vocabulary — but the **information density** and **emotional register** swing dramatically between them.
+Poké Rare Check is a **dual-personality** product wearing one coherent visual identity. Both modes share the same paper-toned background, the same generously rounded geometry, and the same Pokémon-character vocabulary — but the **information density** and **emotional register** swing dramatically between them.
 
 **Kid Friendly Mode** is "Apple Arcade meets Pokémon GO." Big tappable purple buttons, two CTAs per screen, friendly-mascot illustrations doing all the explaining. Backgrounds drift into soft sky-blue gradients on the home screen. Confetti-like sparkle accents punctuate moments of delight. Notifications are illustrated character cards (Pikachu, Squirtle, Charmander, Gengar, Eevee, Meowth) each with one-line celebratory copy. Tone: **warm, encouraging, never punitive**.
 

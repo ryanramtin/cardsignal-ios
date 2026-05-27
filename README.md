@@ -1,4 +1,4 @@
-# RareCheck — Pokémon Card Scanner & Pricing
+# Poké Rare Check — Pokémon Card Scanner & Pricing
 
 [![iOS](https://img.shields.io/badge/iOS-17.0%2B-blue)](https://developer.apple.com/ios/)
 [![Swift](https://img.shields.io/badge/Swift-5.10-orange)](https://swift.org)
