@@ -25,6 +25,7 @@
 		D24747D9E772993EABD9905C /* CardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C785804290248FC3CD3703 /* CardModels.swift */; };
 		E088C005372DE5942EEEFAB5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 60E492D30C370049437E4301 /* Assets.xcassets */; };
 		E26018C15ED2CD7CEDD06ADB /* RareCheckApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71419CC703C4295F0C8EDFBF /* RareCheckApp.swift */; };
+		EF7A5E0B7A44C06A0F32B511 /* rarecheck_card_index_seed.json in Resources */ = {isa = PBXBuildFile; fileRef = EF7A5E0A7A44C06A0F32B511 /* rarecheck_card_index_seed.json */; };
 		F42D50D92D3CBC8D944A7C8E /* CollectionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C65D43657C6FB1B91B7654B /* CollectionViewModel.swift */; };
 		F80271142FDAB33DC8B1C0A5 /* PHashMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ADC79BDA023AEF589F14D76 /* PHashMatcher.swift */; };
 		F970C4D0AD59457EDF313EA0 /* ScanFlowSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23AED91678A757EDEEE2400F /* ScanFlowSmokeTests.swift */; };
@@ -68,6 +69,7 @@
 		D344A4D1A0AC7FAE25445B9D /* CameraViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraViewModel.swift; sourceTree = "<group>"; };
 		DDBBCCBB12A29FBC4767D070 /* RareCheckTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = RareCheckTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E9144E21CF6E4733CC82483C /* PersistenceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceController.swift; sourceTree = "<group>"; };
+		EF7A5E0A7A44C06A0F32B511 /* rarecheck_card_index_seed.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = rarecheck_card_index_seed.json; sourceTree = "<group>"; };
 		F3D26ADDEAF233F2E6CC872D /* RareCheck.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = RareCheck.xcdatamodel; sourceTree = "<group>"; };
 		F7B8715E4717B3B8A23A4182 /* CardDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -154,6 +156,7 @@
 			children = (
 				60E492D30C370049437E4301 /* Assets.xcassets */,
 				9C047D88194EF51503DE2D77 /* Info.plist */,
+				EF7A5E0A7A44C06A0F32B511 /* rarecheck_card_index_seed.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -303,6 +306,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E088C005372DE5942EEEFAB5 /* Assets.xcassets in Resources */,
+				EF7A5E0B7A44C06A0F32B511 /* rarecheck_card_index_seed.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

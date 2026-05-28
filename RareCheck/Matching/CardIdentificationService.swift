@@ -265,6 +265,10 @@ final class LocalCardIndex {
     static let shared = LocalCardIndex()
     var index: [LocalCardRecord]?
 
+    private let seedResourceName = "rarecheck_card_index_seed"
+    private let refreshInterval: TimeInterval = 7 * 24 * 60 * 60
+    private var isRefreshing = false
+
     private let cacheURL: URL = {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("rarecheck_local_index.json")
@@ -273,17 +277,63 @@ final class LocalCardIndex {
     init() { loadFromDisk() }
 
     private func loadFromDisk() {
-        guard let data = try? Data(contentsOf: cacheURL),
-              let records = try? JSONDecoder().decode([LocalCardRecord].self, from: data) else {
-            index = []
+        if let data = try? Data(contentsOf: cacheURL),
+           let records = try? JSONDecoder().decode([LocalCardRecord].self, from: data),
+           !records.isEmpty {
+            index = records
             return
         }
-        index = records
+
+        if let records = loadBundledSeed(), !records.isEmpty {
+            index = records
+            return
+        }
+
+        index = []
     }
 
     func update(with records: [LocalCardRecord]) {
         index = records
         try? JSONEncoder().encode(records).write(to: cacheURL)
+    }
+
+    func refreshFromPokemonTCGIfNeeded(maxPages: Int = 8, pageSize: Int = 250) async {
+        guard !isRefreshing else { return }
+        guard shouldRefreshCache else { return }
+
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        do {
+            let records = try await PokemonTCGIndexClient().downloadIndex(maxPages: maxPages, pageSize: pageSize)
+            guard !records.isEmpty else { return }
+            update(with: records)
+            print("[RareCheck] Pokemon TCG local index refreshed: \(records.count) cards")
+        } catch {
+            print("[RareCheck] Pokemon TCG local index refresh skipped: \(error.localizedDescription)")
+        }
+    }
+
+    private var shouldRefreshCache: Bool {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
+              let modifiedAt = attributes[.modificationDate] as? Date,
+              !(index?.isEmpty ?? true) else {
+            return true
+        }
+        return Date().timeIntervalSince(modifiedAt) >= refreshInterval
+    }
+
+    private func loadBundledSeed() -> [LocalCardRecord]? {
+        let bundles = [Bundle.main, Bundle(for: LocalCardIndex.self)] + Bundle.allBundles
+        for bundle in bundles {
+            guard let url = bundle.url(forResource: seedResourceName, withExtension: "json"),
+                  let data = try? Data(contentsOf: url),
+                  let records = try? JSONDecoder().decode([LocalCardRecord].self, from: data) else {
+                continue
+            }
+            return records
+        }
+        return nil
     }
 }
 
@@ -297,6 +347,105 @@ struct LocalCardRecord: Codable {
     let imageURL: String
     let pHash: UInt64?
     let lastKnownPrice: PriceData?
+}
+
+private struct PokemonTCGIndexClient {
+    private let endpoint = URL(string: "https://api.pokemontcg.io/v2/cards")!
+
+    func downloadIndex(maxPages: Int, pageSize: Int) async throws -> [LocalCardRecord] {
+        let boundedPageSize = min(max(pageSize, 1), 250)
+        let boundedPages = min(max(maxPages, 1), 60)
+        var records: [LocalCardRecord] = []
+        var totalCount: Int?
+
+        for page in 1...boundedPages {
+            var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "page", value: "\(page)"),
+                URLQueryItem(name: "pageSize", value: "\(boundedPageSize)"),
+                URLQueryItem(name: "select", value: "id,name,set,number,rarity,images,tcgplayer")
+            ]
+
+            let (data, response) = try await URLSession.shared.data(from: components.url!)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw APIError.invalidResponse
+            }
+
+            let decoded = try JSONDecoder().decode(PokemonTCGCardPage.self, from: data)
+            totalCount = decoded.totalCount
+            records += decoded.data.compactMap(\.localRecord)
+
+            if decoded.data.count < boundedPageSize { break }
+            if let totalCount, records.count >= totalCount { break }
+        }
+
+        return records
+    }
+}
+
+private struct PokemonTCGCardPage: Decodable {
+    let data: [PokemonTCGCard]
+    let totalCount: Int?
+}
+
+private struct PokemonTCGCard: Decodable {
+    let id: String
+    let name: String
+    let set: PokemonTCGSet?
+    let number: String?
+    let rarity: String?
+    let images: PokemonTCGImages?
+    let tcgplayer: PokemonTCGPlayer?
+
+    var localRecord: LocalCardRecord? {
+        LocalCardRecord(
+            id: id,
+            name: name,
+            setName: set?.name ?? "",
+            setCode: set?.id ?? "",
+            collectorNumber: number ?? "",
+            rarity: rarity ?? "",
+            imageURL: images?.small ?? images?.large ?? "",
+            pHash: nil,
+            lastKnownPrice: tcgplayer?.preferredPrice
+        )
+    }
+}
+
+private struct PokemonTCGSet: Decodable {
+    let id: String
+    let name: String
+}
+
+private struct PokemonTCGImages: Decodable {
+    let small: String?
+    let large: String?
+}
+
+private struct PokemonTCGPlayer: Decodable {
+    let prices: [String: PokemonTCGPrice]?
+
+    var preferredPrice: PriceData? {
+        let preferred = ["holofoil", "normal", "reverseHolofoil", "1stEditionHolofoil", "unlimitedHolofoil"]
+            .compactMap { prices?[$0] }
+            .first
+        guard let preferred else { return nil }
+        return PriceData(
+            low: preferred.low ?? 0,
+            mid: preferred.mid ?? 0,
+            high: preferred.high ?? 0,
+            market: preferred.market ?? preferred.mid ?? 0,
+            currency: "USD",
+            updatedAt: Date()
+        )
+    }
+}
+
+private struct PokemonTCGPrice: Decodable {
+    let low: Double?
+    let mid: Double?
+    let high: Double?
+    let market: Double?
 }
 
 extension PriceData {

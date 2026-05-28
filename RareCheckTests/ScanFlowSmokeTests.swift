@@ -44,12 +44,26 @@ final class ScanFlowSmokeTests: XCTestCase {
         XCTAssertEqual(a, b, "Same image must produce same hash")
     }
 
-    func testLocalCardIndexIsEmptyOnFreshInstall() {
-        // The pipeline expects a pre-seeded local index. Cold install ships
-        // none, so the index is [] and localMatch always returns nil.
+    func testLocalCardIndexLoadsBundledSeedOnFreshInstall() {
+        // Cold installs ship a small bundled Pokemon TCG seed index so local
+        // lookup has immediate candidates while the larger cache refreshes in
+        // the background.
         let index = LocalCardIndex.shared.index
-        XCTAssertNotNil(index, "Index should be loaded (empty array) on first call")
-        XCTAssertTrue(index?.isEmpty ?? false, "Cold install: local index is empty")
+        XCTAssertNotNil(index, "Index should be loaded on first call")
+        XCTAssertFalse(index?.isEmpty ?? true, "Cold install should start with bundled seed data")
+        XCTAssertTrue(index?.contains { $0.id == "det1-1" && $0.name == "Bulbasaur" } ?? false)
+    }
+
+    func testBundledCardIndexSeedIsPresentAndDecodable() throws {
+        let bundles = [Bundle.main, Bundle(for: Self.self)] + Bundle.allBundles
+        let seedURL = bundles
+            .lazy
+            .compactMap { $0.url(forResource: "rarecheck_card_index_seed", withExtension: "json") }
+            .first
+        let url = try XCTUnwrap(seedURL, "Seed card index should be copied into a test-visible bundle")
+        let records = try JSONDecoder().decode([LocalCardRecord].self, from: Data(contentsOf: url))
+        XCTAssertGreaterThanOrEqual(records.count, 5)
+        XCTAssertTrue(records.contains { $0.id == "det1-1" && $0.name == "Bulbasaur" })
     }
 
     /// End-to-end: cold install + dummy image. Confirms the pipeline runs
