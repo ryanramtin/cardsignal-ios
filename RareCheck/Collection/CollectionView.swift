@@ -223,7 +223,7 @@ struct CollectionCardTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            AsyncImage(url: URL(string: card.imageURL ?? "")) { img in
+            AsyncImage(url: card.preferredDisplayImageURL) { img in
                 img.resizable().aspectRatio(contentMode: .fit)
             } placeholder: {
                 RoundedRectangle(cornerRadius: 8).fill(.secondary.opacity(0.15))
@@ -248,7 +248,7 @@ struct CollectionListRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: URL(string: card.imageURL ?? "")) { img in
+            AsyncImage(url: card.preferredDisplayImageURL) { img in
                 img.resizable().aspectRatio(contentMode: .fit)
             } placeholder: {
                 RoundedRectangle(cornerRadius: 4).fill(.secondary.opacity(0.15))
@@ -272,6 +272,10 @@ struct CollectionListRow: View {
 // MARK: - CoreData → CardMatch bridge
 
 extension SavedCard {
+    var preferredDisplayImageURL: URL? {
+        toCardMatch().preferredDisplayImageURL
+    }
+
     func toCardMatch() -> CardMatch {
         CardMatch(
             id: cardId ?? UUID().uuidString,

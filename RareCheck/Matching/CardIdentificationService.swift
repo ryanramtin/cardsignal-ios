@@ -36,9 +36,10 @@ final class CardIdentificationService: ObservableObject {
         }
 
         // Step 2: Run OCR + pHash concurrently
+        let pHashMatcher = self.pHashMatcher
         async let ocrResult = ocrService.extractCardInfo(from: cardImage)
-        async let imageHash = Task.detached(priority: .userInitiated) { [weak self] in
-            self?.pHashMatcher.hash(of: cardImage)
+        async let imageHash = Task.detached(priority: .userInitiated) {
+            pHashMatcher.hash(of: cardImage)
         }.value
 
         let (ocr, hash) = try await (ocrResult, imageHash)
@@ -312,32 +313,26 @@ final class CardScannerViewModel: ObservableObject {
     @Published var isProcessing = false
     @Published var identificationResult: IdentificationResult?
     @Published var lastError: String?
+    @Published var isFramed = false
 
-    // Auto-capture: when a card is detected continuously for this many
-    // consecutive analyze ticks (~0.5s each), fire the shutter automatically
-    // by toggling `shouldAutoCapture`. The view observes and triggers capture.
     @Published var shouldAutoCapture = false
 
     private let identificationService = CardIdentificationService.shared
     private let persistenceController = PersistenceController.shared
 
     private var frameThrottle = 0
-    private var consecutiveDetections = 0
-    private let lockThreshold = 2  // quick but stable enough to avoid room photos
+    private var stableFrameCount = 0
+    private var lastDetectedFrame: DetectedCardFrame?
+    private var autoCaptureArmed = true
+    private let analysisThrottle = 3
+    private let lockThreshold = 4
 
     func analyzeFrame(_ buffer: CVPixelBuffer) {
         frameThrottle += 1
-        guard frameThrottle % 6 == 0 else { return }  // Check about 5x/sec at 30fps
-        let hasCard = CardDetector.shared.hasCard(in: buffer)
+        guard frameThrottle % analysisThrottle == 0 else { return }
+        let detectedFrame = CardDetector.shared.detectFrame(in: buffer)
         Task { @MainActor in
-            self.isDetecting = hasCard
-            if hasCard {
-                self.consecutiveDetections = min(self.consecutiveDetections + 1, self.lockThreshold)
-            } else {
-                self.consecutiveDetections = 0
-            }
-            self.isLocked = self.consecutiveDetections >= self.lockThreshold
-            self.lockProgress = Double(self.consecutiveDetections) / Double(self.lockThreshold)
+            self.applyDetection(detectedFrame)
         }
     }
 
@@ -368,6 +363,54 @@ final class CardScannerViewModel: ObservableObject {
     func saveCard(_ card: CardMatch) -> PersistenceController.SaveOutcome {
         persistenceController.saveCard(card)
     }
+
+    func prepareCapturedImage(_ image: UIImage) async -> UIImage {
+        await CardDetector.shared.detectAndCrop(from: image) ?? image.rareCheckNormalizedUp()
+    }
+
+    func markCaptureStarted() {
+        shouldAutoCapture = false
+        autoCaptureArmed = false
+    }
+
+    func markCaptureFinished() {
+        if !isLocked {
+            autoCaptureArmed = true
+        }
+    }
+
+    func applyDetection(_ detectedFrame: DetectedCardFrame?) {
+        isDetecting = detectedFrame != nil
+        isFramed = detectedFrame != nil
+
+        guard let detectedFrame else {
+            stableFrameCount = 0
+            lastDetectedFrame = nil
+            isLocked = false
+            lockProgress = 0
+            autoCaptureArmed = true
+            shouldAutoCapture = false
+            return
+        }
+
+        if let lastDetectedFrame, detectedFrame.isStable(comparedTo: lastDetectedFrame) {
+            stableFrameCount = min(stableFrameCount + 1, lockThreshold)
+        } else {
+            stableFrameCount = 1
+        }
+
+        lastDetectedFrame = detectedFrame
+        isLocked = stableFrameCount >= lockThreshold
+        lockProgress = Double(stableFrameCount) / Double(lockThreshold)
+
+        if !isLocked {
+            shouldAutoCapture = false
+            return
+        }
+
+        guard autoCaptureArmed, !isProcessing else { return }
+        shouldAutoCapture = true
+    }
 }
 
 extension IdentificationResult: Identifiable {
@@ -391,6 +434,16 @@ enum CardIdentificationError: LocalizedError {
                 return "No Pokemon database match found. Try moving closer and keeping the card flat in the frame."
             }
             return "No confident Pokemon database match found for: \(names). Try moving closer, reducing glare, and centering the card name."
+        }
+    }
+}
+
+private extension UIImage {
+    func rareCheckNormalizedUp() -> UIImage {
+        guard imageOrientation != .up else { return self }
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
         }
     }
 }

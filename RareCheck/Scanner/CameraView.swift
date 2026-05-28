@@ -31,6 +31,7 @@ struct ScannerContainerView: View {
     @State private var capturedPreview: UIImage?
     @State private var resultCapture: UIImage?
     @State private var pendingLockedCapture = false
+    @State private var isAutoCapturePending = false
     @State private var capturePulse = false
 
     var body: some View {
@@ -45,6 +46,7 @@ struct ScannerContainerView: View {
                     // Card finder overlay
                     CardFinderOverlay(
                         isDetecting: scannerVM.isDetecting,
+                        isFramed: scannerVM.isFramed,
                         isLocked: scannerVM.isLocked,
                         lockProgress: scannerVM.lockProgress,
                         isCapturing: cameraVM.isCapturing,
@@ -83,23 +85,50 @@ struct ScannerContainerView: View {
                     return
                 }
                 pendingLockedCapture = false
-                resultCapture = img
-                withAnimation(.easeOut(duration: 0.12)) {
-                    capturedPreview = img
-                    capturePulse = true
-                }
                 Task {
+                    let preparedImage = await scannerVM.prepareCapturedImage(img)
+                    await MainActor.run {
+                        resultCapture = preparedImage
+                        withAnimation(.easeOut(duration: 0.12)) {
+                            capturedPreview = preparedImage
+                            capturePulse = true
+                        }
+                    }
                     try? await Task.sleep(nanoseconds: 350_000_000)
                     await MainActor.run {
                         withAnimation(.easeOut(duration: 0.2)) { capturePulse = false }
                     }
-                    await scannerVM.identify(image: img)
+                    await scannerVM.identify(image: preparedImage)
                     await MainActor.run {
+                        scannerVM.markCaptureFinished()
                         withAnimation(.easeOut(duration: 0.2)) {
                             capturedPreview = nil
                             cameraVM.capturedImage = nil
                         }
                     }
+                }
+            }
+            .onChange(of: scannerVM.shouldAutoCapture) { _, shouldCapture in
+                guard shouldCapture,
+                      !pendingLockedCapture,
+                      !isAutoCapturePending,
+                      !cameraVM.isCapturing,
+                      !scannerVM.isProcessing,
+                      capturedPreview == nil else {
+                    return
+                }
+                isAutoCapturePending = true
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 180_000_000)
+                    defer { isAutoCapturePending = false }
+                    guard scannerVM.shouldAutoCapture,
+                          scannerVM.isLocked,
+                          !cameraVM.isCapturing,
+                          !scannerVM.isProcessing,
+                          capturedPreview == nil else {
+                        return
+                    }
+                    triggerCapture()
                 }
             }
             // Surface identification errors so "thinking → nothing" isn't
@@ -136,12 +165,7 @@ struct ScannerContainerView: View {
             // capturedImage above, not synchronously here, because
             // capturePhoto() is async (delegate fires on the next frame).
             Button {
-                guard scannerVM.isLocked else {
-                    scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green READY border before scanning."
-                    return
-                }
-                pendingLockedCapture = true
-                cameraVM.capturePhoto()
+                triggerCapture()
             } label: {
                 ZStack {
                     Circle().fill(.white).frame(width: 72, height: 72)
@@ -174,12 +198,23 @@ struct ScannerContainerView: View {
             .buttonStyle(.bordered)
         }
     }
+
+    private func triggerCapture() {
+        guard scannerVM.isLocked else {
+            scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green READY border before scanning."
+            return
+        }
+        pendingLockedCapture = true
+        scannerVM.markCaptureStarted()
+        cameraVM.capturePhoto()
+    }
 }
 
 // MARK: - Card Finder Overlay
 
 struct CardFinderOverlay: View {
     var isDetecting: Bool
+    var isFramed: Bool
     var isLocked: Bool
     var lockProgress: Double
     var isCapturing: Bool
@@ -202,7 +237,8 @@ struct CardFinderOverlay: View {
         if isSearching { return "Searching Pokemon database..." }
         if isCaptured { return "Captured" }
         if isCapturing { return "Capturing..." }
-        if isLocked { return "LOCKED - tap shutter" }
+        if isLocked { return "Locked - capturing" }
+        if isFramed { return "Framed - hold still" }
         if isDetecting { return "Hold still..." }
         return "Align card in frame"
     }
@@ -263,6 +299,20 @@ struct CardFinderOverlay: View {
                         .offset(y: y - geo.size.height / 2 + h + 18)
                 }
 
+                if isSearching {
+                    HStack(spacing: 6) {
+                        RotatingPokeballView()
+                        Text("Pokemon DB")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .offset(x: x - geo.size.width / 2 + w * 0.25,
+                            y: y - geo.size.height / 2 - 18)
+                }
+
                 VStack {
                     Spacer()
                     statusPill
@@ -296,6 +346,8 @@ struct CardFinderOverlay: View {
                     Image(systemName: "checkmark.circle.fill")
                 } else if isLocked {
                     Image(systemName: "checkmark.seal.fill")
+                } else if isFramed {
+                    Image(systemName: "viewfinder.circle.fill")
                 } else if isDetecting {
                     Image(systemName: "viewfinder")
                 }
@@ -398,7 +450,7 @@ struct MatchRevealView: View {
                         .blur(radius: revealDatabaseCard ? 3 : 0)
                 }
 
-                AsyncImage(url: URL(string: match.imageURL)) { phase in
+                AsyncImage(url: match.preferredDisplayImageURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -460,7 +512,7 @@ struct CardMatchRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: URL(string: match.imageURL)) { img in
+            AsyncImage(url: match.preferredDisplayImageURL) { img in
                 img.resizable().aspectRatio(contentMode: .fit)
             } placeholder: {
                 RoundedRectangle(cornerRadius: 4).fill(.secondary.opacity(0.2))

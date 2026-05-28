@@ -40,7 +40,7 @@ struct CardDetailView: View {
     // MARK: - Card Image
 
     private var cardImageSection: some View {
-        AsyncImage(url: URL(string: card.imageURL)) { phase in
+        AsyncImage(url: card.preferredDisplayImageURL) { phase in
             switch phase {
             case .success(let image):
                 image

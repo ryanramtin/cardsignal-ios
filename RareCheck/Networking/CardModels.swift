@@ -14,6 +14,9 @@ struct CardMatch: Codable, Identifiable, Hashable {
     let price: PriceData
 
     var confidencePercent: Int { Int(confidence * 100) }
+    var preferredDisplayImageURL: URL? {
+        URL(string: preferredCollectionImageURL)
+    }
     var preferredCollectionImageURL: String {
         let cleaned = imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.contains("images.pokemontcg.io") {

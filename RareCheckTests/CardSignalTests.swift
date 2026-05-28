@@ -27,8 +27,8 @@ final class RareCheckTests: XCTestCase {
 
     func testPHashDifferentImageLowSimilarity() {
         let matcher = PHashMatcher.shared
-        guard let a = UIImage(systemName: "sun.max"),
-              let b = UIImage(systemName: "moon") else { return }
+        let a = makePatternImage(kind: .verticalBars)
+        let b = makePatternImage(kind: .diagonalBlocks)
         let score = matcher.similarity(between: a, and: b) ?? 1
         XCTAssertLessThan(score, 0.9)
     }
@@ -81,8 +81,53 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(saved.imageURL, dbMatch.imageURL)
     }
 
+    func testStableLockedFramesArmAutoCapture() {
+        let viewModel = CardScannerViewModel()
+        let frame = DetectedCardFrame(
+            boundingBox: CGRect(x: 0.18, y: 0.22, width: 0.56, height: 0.72),
+            confidence: 0.92
+        )
+
+        XCTAssertFalse(viewModel.shouldAutoCapture)
+        for _ in 0..<4 {
+            viewModel.applyDetection(frame)
+        }
+
+        XCTAssertTrue(viewModel.isFramed)
+        XCTAssertTrue(viewModel.isLocked)
+        XCTAssertTrue(viewModel.shouldAutoCapture)
+
+        viewModel.markCaptureStarted()
+        XCTAssertFalse(viewModel.shouldAutoCapture)
+        XCTAssertFalse(viewModel.isProcessing)
+    }
+
     func testFreeLimitEnforcement() {
         let controller = PersistenceController(inMemory: true)
         XCTAssertFalse(controller.isAtFreeLimit())
+    }
+
+    private enum TestPattern {
+        case verticalBars
+        case diagonalBlocks
+    }
+
+    private func makePatternImage(kind: TestPattern) -> UIImage {
+        let size = CGSize(width: 96, height: 96)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            UIColor.black.setFill()
+
+            switch kind {
+            case .verticalBars:
+                context.fill(CGRect(x: 14, y: 0, width: 18, height: 96))
+                context.fill(CGRect(x: 56, y: 0, width: 14, height: 96))
+            case .diagonalBlocks:
+                context.fill(CGRect(x: 8, y: 8, width: 24, height: 24))
+                context.fill(CGRect(x: 36, y: 36, width: 24, height: 24))
+                context.fill(CGRect(x: 64, y: 64, width: 24, height: 24))
+            }
+        }
     }
 }

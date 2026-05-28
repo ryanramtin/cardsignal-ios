@@ -3,6 +3,31 @@ import CoreImage
 import UIKit
 import ImageIO
 
+struct DetectedCardFrame: Equatable {
+    let boundingBox: CGRect
+    let confidence: Float
+
+    var center: CGPoint {
+        CGPoint(x: boundingBox.midX, y: boundingBox.midY)
+    }
+
+    var area: CGFloat {
+        boundingBox.width * boundingBox.height
+    }
+
+    var aspectRatio: CGFloat {
+        guard boundingBox.height > 0 else { return 0 }
+        return boundingBox.width / boundingBox.height
+    }
+
+    func isStable(comparedTo previous: DetectedCardFrame) -> Bool {
+        let centerShift = hypot(center.x - previous.center.x, center.y - previous.center.y)
+        let areaDelta = abs(area - previous.area)
+        let aspectDelta = abs(aspectRatio - previous.aspectRatio)
+        return centerShift <= 0.035 && areaDelta <= 0.08 && aspectDelta <= 0.08
+    }
+}
+
 // MARK: - Card Detector
 // Uses VNDetectRectanglesRequest to find the card bounding box in a frame/image
 
@@ -21,6 +46,11 @@ final class CardDetector {
         let context = CIContext()
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
         return await detectAndCrop(from: cgImage, orientation: .right)
+    }
+
+    func detectFrame(in pixelBuffer: CVPixelBuffer) -> DetectedCardFrame? {
+        detectRectangle(in: VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:]))
+            .map { DetectedCardFrame(boundingBox: $0.boundingBox, confidence: $0.confidence) }
     }
 
     private func detectAndCrop(from cgImage: CGImage, orientation: CGImagePropertyOrientation) async -> UIImage? {
@@ -45,6 +75,20 @@ final class CardDetector {
             let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
             try? handler.perform([request])
         }
+    }
+
+    private func detectRectangle(in handler: VNImageRequestHandler) -> VNRectangleObservation? {
+        var result: VNRectangleObservation?
+        let request = VNDetectRectanglesRequest { req, _ in
+            result = (req.results as? [VNRectangleObservation])?.first
+        }
+        request.minimumAspectRatio = 0.60
+        request.maximumAspectRatio = 0.80
+        request.minimumSize = 0.25
+        request.minimumConfidence = 0.65
+        request.maximumObservations = 1
+        try? handler.perform([request])
+        return result
     }
 
     // MARK: - Perspective Correction (four-point transform)
@@ -84,19 +128,7 @@ final class CardDetector {
     // MARK: - Live Frame Detection (returns bool for overlay highlight)
 
     func hasCard(in pixelBuffer: CVPixelBuffer) -> Bool {
-        var result = false
-        let request = VNDetectRectanglesRequest { req, _ in
-            result = (req.results as? [VNRectangleObservation])?.first != nil
-        }
-        request.minimumAspectRatio = 0.60
-        request.maximumAspectRatio = 0.80
-        request.minimumSize = 0.25
-        request.minimumConfidence = 0.65
-        request.maximumObservations = 1
-
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .right, options: [:])
-        try? handler.perform([request])
-        return result
+        detectFrame(in: pixelBuffer) != nil
     }
 }
 

@@ -7,8 +7,8 @@ import Accelerate
 //  1. Resize image to 32x32 grayscale
 //  2. Apply DCT (discrete cosine transform)
 //  3. Take top-left 8x8 of DCT (low frequencies)
-//  4. Compute mean of those 64 values
-//  5. Build 64-bit hash: each bit = (pixel > mean)
+//  4. Drop the DC coefficient and compute the mean of the remaining values
+//  5. Build a 63-bit hash: each bit = (coefficient > mean)
 //  6. Hamming distance between two hashes = dissimilarity
 //
 // Similarity score = 1 - (hammingDistance / 64)
@@ -29,10 +29,11 @@ final class PHashMatcher {
         let dctBlock = dct2D(pixels, size: dctSize)
         let topLeft = extract8x8(dctBlock, fullSize: dctSize)
 
-        let mean = topLeft.reduce(0, +) / Float(topLeft.count)
+        let coefficients = Array(topLeft.dropFirst())
+        let mean = coefficients.reduce(0, +) / Float(coefficients.count)
 
         var hash: UInt64 = 0
-        for (i, val) in topLeft.enumerated() {
+        for (i, val) in coefficients.enumerated() {
             if val > mean { hash |= 1 << i }
         }
         return hash
@@ -44,7 +45,7 @@ final class PHashMatcher {
     func similarity(between a: UInt64, and b: UInt64) -> Double {
         let xor = a ^ b
         let distance = xor.nonzeroBitCount
-        return 1.0 - Double(distance) / 64.0
+        return 1.0 - Double(distance) / 63.0
     }
 
     func similarity(between imageA: UIImage, and imageB: UIImage) -> Double? {
