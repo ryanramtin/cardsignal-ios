@@ -5,10 +5,9 @@ import UIKit
 // Orchestration:
 //  1. Run OCR + card detection in parallel
 //  2. Score OCR match against local name index
-//  3. Score pHash against cached artwork hashes
-//  4. Combine: confidence = 0.6 * ocrScore + 0.4 * hashScore
-//  5. If confidence >= 0.70 → resolve locally (no network)
-//  6. If confidence < 0.70 → send to backend API
+//  3. Score pHash when cached artwork hashes are available
+//  4. Resolve locally when OCR/hash evidence is strong enough
+//  5. Fall back to the backend API for uncertain matches
 
 @MainActor
 final class CardIdentificationService: ObservableObject {
@@ -20,6 +19,8 @@ final class CardIdentificationService: ObservableObject {
     private let api = APIClient.shared
 
     private let localConfidenceThreshold: Double = 0.70
+    private let localTextOnlyConfidenceThreshold: Double = 0.62
+    private let localRescueConfidenceThreshold: Double = 0.78
     private let apiConfidenceThreshold: Double = 0.70
     private let ocrWeight: Double = 0.60
     private let hashWeight: Double = 0.40
@@ -44,6 +45,11 @@ final class CardIdentificationService: ObservableObject {
 
         let (ocr, hash) = try await (ocrResult, imageHash)
         let candidateNames = fallbackNameCandidates(from: ocr)
+        let localRescueMatches = LocalCardIndex.shared.bestOCRRescueMatches(
+            candidateNames: candidateNames,
+            collectorNumber: ocr.collectorNumber,
+            setCode: ocr.setCode
+        )
 
         guard !candidateNames.isEmpty else {
             throw CardIdentificationError.noReadableCardText
@@ -52,9 +58,16 @@ final class CardIdentificationService: ObservableObject {
         // Step 3: Attempt local resolution
         if let localMatches = await localMatch(ocr: ocr, imageHash: hash),
            !localMatches.isEmpty,
-           localMatches[0].confidence >= localConfidenceThreshold {
+           shouldTrustLocalMatch(localMatches[0], ocr: ocr, imageHash: hash) {
             let ms = Int(Date().timeIntervalSince(start) * 1000)
             return IdentificationResult(matches: localMatches, source: .local, processingTimeMs: ms)
+        }
+
+        if let bestRescue = localRescueMatches.first,
+           bestRescue.confidence >= localRescueConfidenceThreshold {
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            print("[RareCheck] Resolved locally via OCR rescue candidates")
+            return IdentificationResult(matches: localRescueMatches, source: .local, processingTimeMs: ms)
         }
 
         // Step 4: Fall back to API. Use the cleaned name candidates in
@@ -67,26 +80,40 @@ final class CardIdentificationService: ObservableObject {
         print("[RareCheck] Pokemon DB candidates: \(apiCandidates)")
         var apiResponse = CardIdentifyResponse(matches: [], processingTimeMs: 0)
 
-        for candidate in apiCandidates {
-            let candidateStart = Date()
-            let candidateHints = CardIdentifyOCRHints(
-                name: candidate,
-                collectorNumber: ocr.collectorNumber,
-                setCode: ocr.setCode,
-                rawText: nil
-            )
-            let candidateResponse = try await api
-                .identifyCard(imageData: compressed, ocrHints: candidateHints)
-                .filtered(minConfidence: apiConfidenceThreshold)
-            let elapsed = Int(Date().timeIntervalSince(candidateStart) * 1000)
-            print("[RareCheck] Pokemon DB lookup '\(candidate)' returned \(candidateResponse.matches.count) confident matches in \(elapsed)ms")
-            if !candidateResponse.matches.isEmpty {
-                apiResponse = candidateResponse
-                break
+        do {
+            for candidate in apiCandidates {
+                let candidateStart = Date()
+                let candidateHints = CardIdentifyOCRHints(
+                    name: candidate,
+                    collectorNumber: ocr.collectorNumber,
+                    setCode: ocr.setCode,
+                    rawText: nil
+                )
+                let candidateResponse = try await api
+                    .identifyCard(imageData: compressed, ocrHints: candidateHints)
+                    .filtered(minConfidence: apiConfidenceThreshold)
+                let elapsed = Int(Date().timeIntervalSince(candidateStart) * 1000)
+                print("[RareCheck] Pokemon DB lookup '\(candidate)' returned \(candidateResponse.matches.count) confident matches in \(elapsed)ms")
+                if !candidateResponse.matches.isEmpty {
+                    apiResponse = candidateResponse
+                    break
+                }
             }
+        } catch {
+            if !localRescueMatches.isEmpty {
+                let ms = Int(Date().timeIntervalSince(start) * 1000)
+                print("[RareCheck] API lookup failed; using local OCR rescue candidates")
+                return IdentificationResult(matches: localRescueMatches, source: .local, processingTimeMs: ms)
+            }
+            throw error
         }
 
         guard !apiResponse.matches.isEmpty else {
+            if !localRescueMatches.isEmpty {
+                let ms = Int(Date().timeIntervalSince(start) * 1000)
+                print("[RareCheck] API returned no confident matches; showing local OCR rescue candidates")
+                return IdentificationResult(matches: localRescueMatches, source: .local, processingTimeMs: ms)
+            }
             throw CardIdentificationError.noConfidentPokemonMatch(candidateNames)
         }
 
@@ -100,10 +127,15 @@ final class CardIdentificationService: ObservableObject {
         // Load local card index (name → cardId mappings cached on first launch)
         guard let index = LocalCardIndex.shared.index else { return nil }
 
-        var candidates: [(card: LocalCardRecord, score: Double)] = []
+        let normalizedOCRName = ocr.name.map(Self.normalizedCardText)
+        let nameCounts = Dictionary(grouping: index, by: { Self.normalizedCardText($0.name) })
+            .mapValues(\.count)
+
+        var candidates: [(card: LocalCardRecord, score: Double, hasHashEvidence: Bool)] = []
 
         for record in index {
             var score = 0.0
+            var hasHashEvidence = false
 
             // OCR scoring
             if let name = ocr.name {
@@ -121,15 +153,29 @@ final class CardIdentificationService: ObservableObject {
             if let queryHash = imageHash, let storedHash = record.pHash {
                 let hashScore = pHashMatcher.similarity(between: queryHash, and: storedHash)
                 score += hashScore * hashWeight
+                hasHashEvidence = true
+            } else if isStrongTextOnlyMatch(
+                record: record,
+                normalizedOCRName: normalizedOCRName,
+                ocr: ocr,
+                nameCounts: nameCounts
+            ) {
+                // Downloaded Pokemon TCG records do not include local artwork
+                // hashes yet. Let strong unique text evidence carry local
+                // lookup instead of always falling through to the API.
+                score += 0.04
             }
 
-            if score > 0.3 { candidates.append((record, score)) }
+            if score > 0.3 { candidates.append((record, score, hasHashEvidence)) }
         }
 
         guard !candidates.isEmpty else { return nil }
 
         let top3 = candidates
-            .sorted { $0.score > $1.score }
+            .sorted {
+                if $0.score == $1.score { return $0.card.name < $1.card.name }
+                return $0.score > $1.score
+            }
             .prefix(3)
 
         return top3.map { item in
@@ -141,10 +187,53 @@ final class CardIdentificationService: ObservableObject {
                 collectorNumber: item.card.collectorNumber,
                 rarity: item.card.rarity,
                 imageURL: item.card.imageURL,
-                confidence: min(item.score, 1.0),
+                confidence: min(item.score, item.hasHashEvidence ? 1.0 : 0.90),
                 price: item.card.lastKnownPrice ?? PriceData.zero
             )
         }
+    }
+
+    private func shouldTrustLocalMatch(_ match: CardMatch, ocr: OCRCardInfo, imageHash: UInt64?) -> Bool {
+        if match.confidence >= localConfidenceThreshold {
+            return true
+        }
+
+        guard imageHash != nil,
+              match.confidence >= localTextOnlyConfidenceThreshold,
+              let record = LocalCardIndex.shared.index?.first(where: { $0.id == match.id }) else {
+            return false
+        }
+
+        let normalizedOCRName = ocr.name.map(Self.normalizedCardText)
+        let nameCounts = Dictionary(grouping: LocalCardIndex.shared.index ?? [], by: { Self.normalizedCardText($0.name) })
+            .mapValues(\.count)
+        return isStrongTextOnlyMatch(
+            record: record,
+            normalizedOCRName: normalizedOCRName,
+            ocr: ocr,
+            nameCounts: nameCounts
+        )
+    }
+
+    private func isStrongTextOnlyMatch(
+        record: LocalCardRecord,
+        normalizedOCRName: String?,
+        ocr: OCRCardInfo,
+        nameCounts: [String: Int]
+    ) -> Bool {
+        guard let normalizedOCRName,
+              normalizedOCRName == Self.normalizedCardText(record.name) else {
+            return false
+        }
+
+        if let number = ocr.collectorNumber, !number.isEmpty, record.collectorNumber == number {
+            return true
+        }
+        if let setCode = ocr.setCode, !setCode.isEmpty, record.setCode.caseInsensitiveCompare(setCode) == .orderedSame {
+            return true
+        }
+
+        return nameCounts[normalizedOCRName, default: 0] == 1
     }
 
     // MARK: - String Similarity (Jaro-Winkler)
@@ -208,6 +297,15 @@ final class CardIdentificationService: ObservableObject {
             .forEach { add($0) }
 
         return candidates.prefix(6).map { $0 }
+    }
+
+    private static func normalizedCardText(_ value: String) -> String {
+        value
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .replacingOccurrences(of: #"[^a-zA-Z0-9]+"#, with: " ", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
     }
 
     private func cleanNameCandidate(_ value: String) -> String? {
@@ -344,6 +442,69 @@ final class LocalCardIndex {
             }
     }
 
+    func bestOCRRescueMatches(
+        candidateNames: [String],
+        collectorNumber: String?,
+        setCode: String?,
+        limit: Int = 3
+    ) -> [CardMatch] {
+        guard !candidateNames.isEmpty else { return [] }
+
+        let normalizedCollector = collectorNumber.map(Self.normalizedSearchText) ?? ""
+        let normalizedSetCode = setCode.map(Self.normalizedSearchText) ?? ""
+        var bestByID: [String: CardMatch] = [:]
+
+        for candidate in candidateNames {
+            let normalizedCandidate = Self.normalizedSearchText(candidate)
+            guard !normalizedCandidate.isEmpty else { continue }
+
+            for result in searchCards(matching: candidate, limit: 12) {
+                let normalizedName = Self.normalizedSearchText(result.name)
+                var confidence = baseRescueConfidence(candidate: normalizedCandidate, resultName: normalizedName)
+                guard confidence > 0 else { continue }
+
+                if !normalizedCollector.isEmpty,
+                   normalizedCollector == Self.normalizedSearchText(result.collectorNumber) {
+                    confidence += 0.18
+                }
+                if !normalizedSetCode.isEmpty,
+                   normalizedSetCode == Self.normalizedSearchText(result.setCode) {
+                    confidence += 0.10
+                }
+                if normalizedName == normalizedCandidate {
+                    confidence += 0.04
+                }
+
+                let enriched = CardMatch(
+                    id: result.id,
+                    name: result.name,
+                    setName: result.setName,
+                    setCode: result.setCode,
+                    collectorNumber: result.collectorNumber,
+                    rarity: result.rarity,
+                    imageURL: result.imageURL,
+                    confidence: min(confidence, 0.98),
+                    price: result.price
+                )
+
+                if let existing = bestByID[enriched.id], existing.confidence >= enriched.confidence {
+                    continue
+                }
+                bestByID[enriched.id] = enriched
+            }
+        }
+
+        return bestByID.values
+            .sorted {
+                if $0.confidence == $1.confidence {
+                    return $0.name < $1.name
+                }
+                return $0.confidence > $1.confidence
+            }
+            .prefix(limit)
+            .map { $0 }
+    }
+
     func refreshFromPokemonTCGIfNeeded(maxPages: Int = 120, pageSize: Int = 250) async {
         guard !isRefreshing else { return }
         guard shouldRefreshCache else { return }
@@ -391,6 +552,19 @@ final class LocalCardIndex {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }
+
+    private func baseRescueConfidence(candidate: String, resultName: String) -> Double {
+        guard !candidate.isEmpty, !resultName.isEmpty else { return 0 }
+        if candidate == resultName { return 0.68 }
+        if resultName.hasPrefix(candidate) || candidate.hasPrefix(resultName) { return 0.54 }
+        if resultName.contains(candidate) || candidate.contains(resultName) { return 0.45 }
+
+        let candidateTerms = Set(candidate.split(separator: " ").map(String.init))
+        let resultTerms = Set(resultName.split(separator: " ").map(String.init))
+        let overlap = candidateTerms.intersection(resultTerms).count
+        guard overlap > 0 else { return 0 }
+        return min(0.36 + Double(overlap) * 0.08, 0.52)
+    }
 }
 
 struct LocalCardRecord: Codable {
@@ -410,7 +584,7 @@ private struct PokemonTCGIndexClient {
 
     func downloadIndex(maxPages: Int, pageSize: Int) async throws -> [LocalCardRecord] {
         let boundedPageSize = min(max(pageSize, 1), 250)
-        let boundedPages = min(max(maxPages, 1), 60)
+        let boundedPages = min(max(maxPages, 1), 120)
         var records: [LocalCardRecord] = []
         var totalCount: Int?
 

@@ -102,6 +102,23 @@ final class RareCheckTests: XCTestCase {
         XCTAssertFalse(viewModel.isProcessing)
     }
 
+    func testLocalSearchFindsBundledSeedCardByName() {
+        let results = LocalCardIndex.shared.searchCards(matching: "Bulbasaur")
+        XCTAssertEqual(results.first?.id, "det1-1")
+        XCTAssertEqual(results.first?.name, "Bulbasaur")
+    }
+
+    func testOCRRescueMatchesPromoteExactNameAndMetadata() {
+        let results = LocalCardIndex.shared.bestOCRRescueMatches(
+            candidateNames: ["Bulbasaur", "Scratch"],
+            collectorNumber: "1",
+            setCode: "det1"
+        )
+
+        XCTAssertEqual(results.first?.id, "det1-1")
+        XCTAssertGreaterThanOrEqual(results.first?.confidence ?? 0, 0.90)
+    }
+
     func testFreeLimitEnforcement() {
         let controller = PersistenceController(inMemory: true)
         XCTAssertFalse(controller.isAtFreeLimit())
