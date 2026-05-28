@@ -127,7 +127,7 @@ private struct APIErrorBody: Decodable {
 
 final class KeychainHelper {
     static let shared = KeychainHelper()
-    private let service = "app.rarecheck.jwt"
+    private let service = "com.appgumbo.rarecheck.jwt"
 
     func readJWT() -> String? {
         let query: [String: Any] = [
