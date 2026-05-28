@@ -505,9 +505,13 @@ final class LocalCardIndex {
             .map { $0 }
     }
 
-    func refreshFromPokemonTCGIfNeeded(maxPages: Int = 120, pageSize: Int = 250) async {
+    func refreshFromPokemonTCGIfNeeded(
+        maxPages: Int = 120,
+        pageSize: Int = 250,
+        allowSeededRefresh: Bool = true
+    ) async {
         guard !isRefreshing else { return }
-        guard shouldRefreshCache else { return }
+        guard shouldRefreshCache(allowSeededRefresh: allowSeededRefresh) else { return }
 
         isRefreshing = true
         defer { isRefreshing = false }
@@ -522,7 +526,13 @@ final class LocalCardIndex {
         }
     }
 
-    private var shouldRefreshCache: Bool {
+    private func shouldRefreshCache(allowSeededRefresh: Bool) -> Bool {
+        if !allowSeededRefresh,
+           !(index?.isEmpty ?? true),
+           (try? FileManager.default.attributesOfItem(atPath: cacheURL.path)) == nil {
+            return false
+        }
+
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
               let modifiedAt = attributes[.modificationDate] as? Date,
               !(index?.isEmpty ?? true) else {

@@ -98,7 +98,7 @@ struct CardSearchView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        Task { await refreshIndex() }
+                        Task { await refreshIndex(allowSeededRefresh: true) }
                     } label: {
                         Image(systemName: "arrow.clockwise")
                     }
@@ -117,15 +117,15 @@ struct CardSearchView: View {
             .onAppear(perform: updateResults)
             .onChange(of: query) { _, _ in updateResults() }
             .task {
-                await refreshIndex()
+                await refreshIndex(allowSeededRefresh: false)
             }
         }
     }
 
-    private func refreshIndex() async {
+    private func refreshIndex(allowSeededRefresh: Bool) async {
         guard !isRefreshing else { return }
         isRefreshing = true
-        await LocalCardIndex.shared.refreshFromPokemonTCGIfNeeded()
+        await LocalCardIndex.shared.refreshFromPokemonTCGIfNeeded(allowSeededRefresh: allowSeededRefresh)
         recordCount = LocalCardIndex.shared.recordCount
         updateResults()
         isRefreshing = false

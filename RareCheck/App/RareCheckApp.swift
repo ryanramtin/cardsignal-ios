@@ -17,7 +17,7 @@ struct RareCheckApp: App {
                 .environmentObject(appNavigation)
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .task {
-                    await LocalCardIndex.shared.refreshFromPokemonTCGIfNeeded()
+                    await LocalCardIndex.shared.refreshFromPokemonTCGIfNeeded(allowSeededRefresh: false)
                 }
         }
     }
