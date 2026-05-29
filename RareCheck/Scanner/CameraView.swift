@@ -128,7 +128,7 @@ struct ScannerContainerView: View {
                 isAutoCapturePending = true
                 autoCaptureTask?.cancel()
                 autoCaptureTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    try? await Task.sleep(nanoseconds: 850_000_000)
                     defer { isAutoCapturePending = false }
                     guard !Task.isCancelled else { return }
                     guard scannerVM.shouldAutoCapture,
@@ -236,8 +236,8 @@ struct CardFinderOverlay: View {
         if isSearching { return "Searching Pokemon database..." }
         if isCaptured { return "Captured - searching" }
         if isCapturing { return "Hold still - capturing" }
-        if isAutoCapturePending { return "Capturing automatically" }
-        if isLocked { return "Locked - auto capture" }
+        if isAutoCapturePending { return "READY - hold steady" }
+        if isLocked { return "READY - hold steady" }
         if isFramed { return captureReadiness.guidanceText }
         if isDetecting { return "Center card in frame" }
         return "Align card in frame"
@@ -332,10 +332,10 @@ struct CardFinderOverlay: View {
                                 .tint(.white)
                                 .controlSize(.large)
                         }
-                        Text(isCaptured ? "Captured" : "Capturing")
+                        Text(isCaptured ? "Captured" : "Hold steady")
                             .font(.headline.weight(.bold))
                         if !isCaptured {
-                            Text("Automatically")
+                            Text("Auto capture")
                                 .font(.caption.weight(.semibold))
                                 .textCase(.uppercase)
                                 .foregroundStyle(.white.opacity(0.78))

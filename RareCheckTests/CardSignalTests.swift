@@ -89,18 +89,45 @@ final class RareCheckTests: XCTestCase {
         )
 
         XCTAssertFalse(viewModel.shouldAutoCapture)
-        for _ in 0..<3 {
+        for _ in 0..<5 {
             viewModel.applyDetection(frame)
         }
 
         XCTAssertTrue(viewModel.isFramed)
+        XCTAssertFalse(viewModel.isLocked)
+        XCTAssertFalse(viewModel.shouldAutoCapture)
+
+        viewModel.applyDetection(frame)
+
+        XCTAssertTrue(viewModel.isFramed)
         XCTAssertTrue(viewModel.isLocked)
         XCTAssertTrue(viewModel.shouldAutoCapture)
-        XCTAssertEqual(viewModel.captureReadiness.guidanceText, "Locked - auto capture")
+        XCTAssertEqual(viewModel.captureReadiness.guidanceText, "READY - hold steady")
 
         viewModel.markCaptureStarted()
         XCTAssertFalse(viewModel.shouldAutoCapture)
         XCTAssertFalse(viewModel.isProcessing)
+    }
+
+    func testUnstableFrameResetsAutoCaptureHold() {
+        let viewModel = CardScannerViewModel()
+        let frame = DetectedCardFrame(
+            boundingBox: CGRect(x: 0.18, y: 0.22, width: 0.56, height: 0.72),
+            confidence: 0.92
+        )
+        let shiftedFrame = DetectedCardFrame(
+            boundingBox: CGRect(x: 0.32, y: 0.22, width: 0.56, height: 0.72),
+            confidence: 0.92
+        )
+
+        for _ in 0..<5 {
+            viewModel.applyDetection(frame)
+        }
+        viewModel.applyDetection(shiftedFrame)
+
+        XCTAssertTrue(viewModel.isFramed)
+        XCTAssertFalse(viewModel.isLocked)
+        XCTAssertFalse(viewModel.shouldAutoCapture)
     }
 
     func testScanErrorBlocksAutoRecaptureUntilDismissed() {
@@ -110,7 +137,7 @@ final class RareCheckTests: XCTestCase {
             confidence: 0.92
         )
 
-        for _ in 0..<3 {
+        for _ in 0..<6 {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
@@ -118,13 +145,13 @@ final class RareCheckTests: XCTestCase {
         viewModel.markCaptureStarted()
         viewModel.lastError = "Try again"
         viewModel.markCaptureFinished()
-        for _ in 0..<3 {
+        for _ in 0..<6 {
             viewModel.applyDetection(frame)
         }
         XCTAssertFalse(viewModel.shouldAutoCapture)
 
         viewModel.clearErrorAndResumeScanning()
-        for _ in 0..<3 {
+        for _ in 0..<6 {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
