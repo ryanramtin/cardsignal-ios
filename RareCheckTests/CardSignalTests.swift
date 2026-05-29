@@ -129,6 +129,12 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(results.first?.name, "Bulbasaur")
     }
 
+    func testLocalSearchFindsBundledSeedCardByPokemonTCGID() {
+        let results = LocalCardIndex.shared.searchCards(matching: "det1-1")
+        XCTAssertEqual(results.first?.id, "det1-1")
+        XCTAssertEqual(results.first?.name, "Bulbasaur")
+    }
+
     func testOCRRescueMatchesPromoteExactNameAndMetadata() {
         let results = LocalCardIndex.shared.bestOCRRescueMatches(
             candidateNames: ["Bulbasaur", "Scratch"],

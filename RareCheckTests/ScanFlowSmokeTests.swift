@@ -4,7 +4,7 @@ import UIKit
 
 /// Internal smoke test exercising the full identification pipeline with a
 /// dummy image (solid-color UIImage, no real card). Documents what happens
-/// in each stage on a cold install with no cached local card index.
+/// in each stage on a cold install before the full local card index downloads.
 final class ScanFlowSmokeTests: XCTestCase {
 
     /// Build a solid-color UIImage of the given size — stand-in for a captured photo.
@@ -47,7 +47,7 @@ final class ScanFlowSmokeTests: XCTestCase {
     func testLocalCardIndexLoadsBundledSeedOnFreshInstall() {
         // Cold installs ship a small bundled Pokemon TCG seed index so local
         // lookup has immediate candidates while the larger cache refreshes in
-        // the background.
+        // the background from Application Support storage.
         let index = LocalCardIndex.shared.index
         XCTAssertNotNil(index, "Index should be loaded on first call")
         XCTAssertFalse(index?.isEmpty ?? true, "Cold install should start with bundled seed data")
@@ -76,9 +76,9 @@ final class ScanFlowSmokeTests: XCTestCase {
 
         do {
             let result = try await service.identify(image: img)
-            // If this branch ever hits, the local index must have seed data.
-            // That's not the cold-install case we're documenting here.
-            XCTFail("Unexpected success — got \(result.matches.count) matches from \(result.source). Local index should be empty.")
+            // Seed data is present on cold install, but a flat dummy image
+            // should not produce a confident card match.
+            XCTFail("Unexpected success — got \(result.matches.count) matches from \(result.source).")
         } catch let urlError as URLError {
             // Expected: API fallback hits the configured baseURL
             // (Info.plist/APIClient currently defaults to the Railway

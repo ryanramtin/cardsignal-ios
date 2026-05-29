@@ -117,7 +117,7 @@ struct CardSearchView: View {
             .onAppear(perform: updateResults)
             .onChange(of: query) { _, _ in updateResults() }
             .task {
-                await refreshIndex(allowSeededRefresh: false)
+                await refreshIndex(allowSeededRefresh: true)
             }
         }
     }
@@ -142,7 +142,10 @@ struct CardSearchView: View {
         }
 
         if LocalCardIndex.shared.isUsingBundledSeed {
-            return "\(recordCount) starter cards cached. Tap refresh to download the larger Pokemon DB for fast local search."
+            if isRefreshing {
+                return "\(recordCount) starter cards cached. Downloading the larger Pokemon DB for fast local search."
+            }
+            return "\(recordCount) starter cards cached. Tap refresh to retry the larger Pokemon DB download."
         }
 
         return "\(recordCount) cards cached for fast local search."

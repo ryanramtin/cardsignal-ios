@@ -381,6 +381,14 @@ final class LocalCardIndex {
     private var isRefreshing = false
 
     private let cacheURL: URL = {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("RareCheck", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+            .appendingPathComponent("rarecheck_local_index.json")
+    }()
+
+    private let legacyCacheURL: URL = {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("rarecheck_local_index.json")
     }()
@@ -395,6 +403,14 @@ final class LocalCardIndex {
             return
         }
 
+        if let data = try? Data(contentsOf: legacyCacheURL),
+           let records = try? JSONDecoder().decode([LocalCardRecord].self, from: data),
+           !records.isEmpty {
+            update(with: records)
+            try? FileManager.default.removeItem(at: legacyCacheURL)
+            return
+        }
+
         if let records = loadBundledSeed(), !records.isEmpty {
             index = records
             return
@@ -406,6 +422,10 @@ final class LocalCardIndex {
     func update(with records: [LocalCardRecord]) {
         index = records
         try? JSONEncoder().encode(records).write(to: cacheURL)
+        var fileURL = cacheURL
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        try? fileURL.setResourceValues(resourceValues)
     }
 
     var recordCount: Int {
@@ -427,11 +447,13 @@ final class LocalCardIndex {
                 let set = Self.normalizedSearchText(record.setName)
                 let number = Self.normalizedSearchText(record.collectorNumber)
                 let code = Self.normalizedSearchText(record.setCode)
-                let haystack = "\(name) \(set) \(number) \(code)"
+                let id = Self.normalizedSearchText(record.id)
+                let haystack = "\(id) \(name) \(set) \(number) \(code)"
 
                 guard terms.allSatisfy({ haystack.contains($0) }) else { return nil }
 
                 var score = 0
+                if id == normalizedQuery { score += 120 }
                 if name == normalizedQuery { score += 100 }
                 if name.hasPrefix(normalizedQuery) { score += 60 }
                 if name.contains(normalizedQuery) { score += 35 }
