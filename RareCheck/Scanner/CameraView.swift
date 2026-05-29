@@ -55,7 +55,11 @@ struct ScannerContainerView: View {
                         isCaptured: capturedPreview != nil,
                         isSearching: scannerVM.isProcessing,
                         capturePulse: capturePulse,
-                        capturedImage: capturedPreview
+                        capturedImage: capturedPreview,
+                        canManualCapture: scannerVM.isDetecting && !cameraVM.isCapturing && !scannerVM.isProcessing && capturedPreview == nil,
+                        onManualCapture: {
+                            triggerCapture(allowUnlockedFrame: true)
+                        }
                     )
                 } else {
                     permissionDeniedView
@@ -178,8 +182,8 @@ struct ScannerContainerView: View {
         }
     }
 
-    private func triggerCapture() {
-        guard scannerVM.isLocked else {
+    private func triggerCapture(allowUnlockedFrame: Bool = false) {
+        guard scannerVM.isLocked || allowUnlockedFrame else {
             scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green READY border before scanning."
             return
         }
@@ -202,6 +206,8 @@ struct CardFinderOverlay: View {
     var isSearching: Bool
     var capturePulse: Bool
     var capturedImage: UIImage?
+    var canManualCapture: Bool
+    var onManualCapture: () -> Void
     @State private var searchStartDate = Date()
 
     private var borderColor: Color {
@@ -219,8 +225,8 @@ struct CardFinderOverlay: View {
         if isCapturing { return "Hold still - capturing" }
         if isAutoCapturePending { return "Hold still - auto capture" }
         if isLocked { return "Ready - hold still" }
-        if isFramed { return "Framed - hold still" }
-        if isDetecting { return "Center card in frame" }
+        if isFramed { return canManualCapture ? "Framed - hold or tap frame" : "Framed - hold still" }
+        if isDetecting { return canManualCapture ? "Center card or tap frame" : "Center card in frame" }
         return "Align card in frame"
     }
 
@@ -272,6 +278,18 @@ struct CardFinderOverlay: View {
                     .animation(.easeInOut(duration: 0.16), value: isLocked)
                     .animation(.easeInOut(duration: 0.12), value: isAutoCapturePending)
                     .animation(.spring(response: 0.22, dampingFraction: 0.7), value: capturePulse)
+
+                if canManualCapture && !isLocked && !isAutoCapturePending && !isCapturing {
+                    Button(action: onManualCapture) {
+                        Color.clear
+                            .contentShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Scan current frame")
+                    .frame(width: w, height: h)
+                    .offset(x: x - geo.size.width / 2 + w / 2,
+                            y: y - geo.size.height / 2 + h / 2)
+                }
 
                 if isDetecting && !isLocked {
                     ProgressView(value: min(max(lockProgress, 0), 1))
