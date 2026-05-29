@@ -115,13 +115,13 @@ Adult Mode's "Advanced Tools" four-tile row (Price Alerts / Grading Guide / Comp
 | Risk | Severity | Mitigation |
 |---|---|---|
 | **Pokémon IP** | High — likely App Store rejection or DMCA | Original mascot assets before any external build. |
-| **RevenueCat placeholder key** | High — crashes production | Wire real key + create products in ASC before first TestFlight. |
+| **RevenueCat missing key/products** | Medium — purchases remain unavailable until configured | Code now safely skips setup instead of crashing; still wire real key + create products in ASC before purchase UAT/TestFlight. |
 | **No mode-toggle UI** | Medium — half the product is unbuilt | Build dual-root + Settings toggle in week 1. |
 | **No Insights / Search tabs** | Medium — Adult Mode bottom nav has dead tabs | v1 scope: ship 3 working tabs (Home/Scan/Collection); stub Search + Insights with "Coming soon" cards rather than crash. |
-| **Backend not deployed** | Medium — local-only client can't scan-then-fallback | Deploy `rarecheck-api` to Railway as a checkbox before the iOS app expects it. |
+| **Backend not deployed** | Low — local bundled DB covers normal scan/search flows | Keep backend deployment as an enhancement/fallback path, not a first-run scanner dependency. |
 | **Privacy nutrition labels** | High at submission — Apple now blocks submissions without published `appDataUsages` (per `App Portfolio Status.md` 2026-05-17) | Same blocker Vid2Skill/TokenBonfire have. Resolve in ASC manually. |
 | **`Development Projects` path-with-space** | Low — `pod install` and some Xcode scripts break | If RareCheck needs CocoaPods, use no-space symlink (`/tmp/rarecheck`) per existing PipelineIQ workaround. Currently RareCheck is SwiftPM-only via XcodeGen → no CocoaPods → fine. |
-| **No tests** | Medium — `RareCheckTests/` is a stub dir | Add unit tests for `PHashMatcher`, `CardIdentificationService`, `APIClient` request shapes before any major refactor. |
+| **Test coverage gaps** | Low — core scanner/search tests now run on device, but purchase and real backend fallback still need coverage | Add RevenueCat sandbox and backend fallback tests before purchase/back-end release gates. |
 
 ---
 
