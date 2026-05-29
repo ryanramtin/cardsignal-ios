@@ -114,7 +114,11 @@ final class CardDetector {
             request.maximumObservations = 1
 
             let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
-            try? handler.perform([request])
+            do {
+                try handler.perform([request])
+            } catch {
+                continuation.resume(returning: nil)
+            }
         }
     }
 
