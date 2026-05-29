@@ -21,10 +21,10 @@ struct DetectedCardFrame: Equatable {
     }
 
     var isUsablyFramed: Bool {
-        confidence >= 0.45 &&
-            area >= 0.12 &&
-            (0.12...0.88).contains(center.x) &&
-            (0.10...0.90).contains(center.y)
+        confidence >= 0.35 &&
+            area >= 0.08 &&
+            (0.08...0.92).contains(center.x) &&
+            (0.08...0.92).contains(center.y)
     }
 
     func isStable(comparedTo previous: DetectedCardFrame) -> Bool {
@@ -75,8 +75,8 @@ final class CardDetector {
             // Tune for trading card aspect ratio (2.5 x 3.5 inches ≈ 0.714)
             request.minimumAspectRatio = 0.60
             request.maximumAspectRatio = 0.80
-            request.minimumSize = 0.2
-            request.minimumConfidence = 0.55
+            request.minimumSize = 0.12
+            request.minimumConfidence = 0.42
             request.maximumObservations = 1
 
             let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
@@ -91,8 +91,8 @@ final class CardDetector {
         }
         request.minimumAspectRatio = 0.60
         request.maximumAspectRatio = 0.80
-        request.minimumSize = 0.18
-        request.minimumConfidence = 0.55
+        request.minimumSize = 0.12
+        request.minimumConfidence = 0.42
         request.maximumObservations = 1
         try? handler.perform([request])
         return result

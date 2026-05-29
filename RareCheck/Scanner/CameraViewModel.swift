@@ -101,8 +101,8 @@ final class CameraViewModel: NSObject, ObservableObject {
         isCapturing = true
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .auto
-        settings.isHighResolutionPhotoEnabled = true
-        settings.photoQualityPrioritization = .balanced
+        settings.isHighResolutionPhotoEnabled = false
+        settings.photoQualityPrioritization = .speed
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
 

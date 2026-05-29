@@ -90,7 +90,7 @@ struct ScannerContainerView: View {
                             capturePulse = true
                         }
                     }
-                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    try? await Task.sleep(nanoseconds: 180_000_000)
                     await MainActor.run {
                         withAnimation(.easeOut(duration: 0.2)) { capturePulse = false }
                     }
@@ -115,7 +115,7 @@ struct ScannerContainerView: View {
                 }
                 isAutoCapturePending = true
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    try? await Task.sleep(nanoseconds: 120_000_000)
                     defer { isAutoCapturePending = false }
                     guard scannerVM.shouldAutoCapture,
                           scannerVM.isLocked,
@@ -206,10 +206,10 @@ struct CardFinderOverlay: View {
 
     private var statusText: String {
         if isSearching { return "Searching Pokemon database..." }
-        if isCaptured { return "Captured - keep card in frame" }
-        if isCapturing { return "Capturing now" }
-        if isAutoCapturePending { return "Auto-capturing now" }
-        if isLocked { return "Ready - auto capture armed" }
+        if isCaptured { return "Captured - searching" }
+        if isCapturing { return "Hold still - capturing" }
+        if isAutoCapturePending { return "Hold still - auto capture" }
+        if isLocked { return "Ready - hold still" }
         if isFramed { return "Framed - hold still" }
         if isDetecting { return "Center card in frame" }
         return "Align card in frame"
@@ -296,8 +296,14 @@ struct CardFinderOverlay: View {
                                 .tint(.white)
                                 .controlSize(.large)
                         }
-                        Text(isCaptured ? "Captured" : "Auto capturing")
+                        Text(isCaptured ? "Captured" : "Hold still")
                             .font(.headline.weight(.bold))
+                        if !isCaptured {
+                            Text("Auto capture")
+                                .font(.caption.weight(.semibold))
+                                .textCase(.uppercase)
+                                .foregroundStyle(.white.opacity(0.78))
+                        }
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 22)
