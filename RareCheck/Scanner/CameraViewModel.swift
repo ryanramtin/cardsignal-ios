@@ -47,7 +47,7 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     func setupSession() async {
         session.beginConfiguration()
-        session.sessionPreset = .photo
+        session.sessionPreset = .high
 
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let input = try? AVCaptureDeviceInput(device: device) else {

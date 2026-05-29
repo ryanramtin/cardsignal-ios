@@ -56,11 +56,7 @@ struct ScannerContainerView: View {
                         isCaptured: capturedPreview != nil,
                         isSearching: scannerVM.isProcessing,
                         capturePulse: capturePulse,
-                        capturedImage: capturedPreview,
-                        canManualCapture: scannerVM.isDetecting && !cameraVM.isCapturing && !scannerVM.isProcessing && capturedPreview == nil,
-                        onManualCapture: {
-                            triggerCapture(allowUnlockedFrame: true)
-                        }
+                        capturedImage: capturedPreview
                     )
                 } else {
                     permissionDeniedView
@@ -78,12 +74,12 @@ struct ScannerContainerView: View {
             .onDisappear { cameraVM.stopSession() }
             // Photo capture is async — kick off identification once the
             // image actually lands in @Published capturedImage, then clear
-            // it so the next shutter tap fires a fresh identify().
+            // it so the next auto-capture fires a fresh identify().
             .onChange(of: cameraVM.capturedImage) { _, newImage in
                 guard let img = newImage else { return }
                 guard pendingLockedCapture else {
                     cameraVM.capturedImage = nil
-                    scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green READY border before scanning."
+                    scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green auto-capture border."
                     return
                 }
                 pendingLockedCapture = false
@@ -121,7 +117,7 @@ struct ScannerContainerView: View {
                 }
                 isAutoCapturePending = true
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 120_000_000)
+                    try? await Task.sleep(nanoseconds: 80_000_000)
                     defer { isAutoCapturePending = false }
                     guard scannerVM.shouldAutoCapture,
                           scannerVM.isLocked,
@@ -183,9 +179,9 @@ struct ScannerContainerView: View {
         }
     }
 
-    private func triggerCapture(allowUnlockedFrame: Bool = false) {
-        guard scannerVM.isLocked || allowUnlockedFrame else {
-            scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green READY border before scanning."
+    private func triggerCapture() {
+        guard scannerVM.isLocked else {
+            scannerVM.lastError = "Card is not locked yet. Fill the frame with one card and wait for the green auto-capture border."
             return
         }
         pendingLockedCapture = true
@@ -208,8 +204,6 @@ struct CardFinderOverlay: View {
     var isSearching: Bool
     var capturePulse: Bool
     var capturedImage: UIImage?
-    var canManualCapture: Bool
-    var onManualCapture: () -> Void
     @State private var searchStartDate = Date()
 
     private var borderColor: Color {
@@ -226,10 +220,10 @@ struct CardFinderOverlay: View {
         if isSearching { return "Searching Pokemon database..." }
         if isCaptured { return "Captured - searching" }
         if isCapturing { return "Hold still - capturing" }
-        if isAutoCapturePending { return "Hold still - auto capture" }
-        if isLocked { return "Ready - hold still" }
-        if isFramed { return canManualCapture ? "\(captureReadiness.guidanceText) or tap frame" : captureReadiness.guidanceText }
-        if isDetecting { return canManualCapture ? "Center card or tap frame" : "Center card in frame" }
+        if isAutoCapturePending { return "Capturing automatically" }
+        if isLocked { return "Locked - auto capture" }
+        if isFramed { return captureReadiness.guidanceText }
+        if isDetecting { return "Center card in frame" }
         return "Align card in frame"
     }
 
@@ -282,18 +276,6 @@ struct CardFinderOverlay: View {
                     .animation(.easeInOut(duration: 0.12), value: isAutoCapturePending)
                     .animation(.spring(response: 0.22, dampingFraction: 0.7), value: capturePulse)
 
-                if canManualCapture && !isLocked && !isAutoCapturePending && !isCapturing {
-                    Button(action: onManualCapture) {
-                        Color.clear
-                            .contentShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Scan current frame")
-                    .frame(width: w, height: h)
-                    .offset(x: x - geo.size.width / 2 + w / 2,
-                            y: y - geo.size.height / 2 + h / 2)
-                }
-
                 if isDetecting && !isLocked {
                     VStack(spacing: 8) {
                         ProgressView(value: min(max(lockProgress, 0), 1))
@@ -334,10 +316,10 @@ struct CardFinderOverlay: View {
                                 .tint(.white)
                                 .controlSize(.large)
                         }
-                        Text(isCaptured ? "Captured" : "Hold still")
+                        Text(isCaptured ? "Captured" : "Capturing")
                             .font(.headline.weight(.bold))
                         if !isCaptured {
-                            Text("Auto capture")
+                            Text("Automatically")
                                 .font(.caption.weight(.semibold))
                                 .textCase(.uppercase)
                                 .foregroundStyle(.white.opacity(0.78))

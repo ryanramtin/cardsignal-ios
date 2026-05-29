@@ -754,7 +754,7 @@ final class CardScannerViewModel: ObservableObject {
     private var lastDetectedFrame: DetectedCardFrame?
     private var autoCaptureArmed = true
     private let analysisThrottle = 1
-    private let lockThreshold = 3
+    private let lockThreshold = 2
 
     func analyzeFrame(_ buffer: CVPixelBuffer) {
         frameThrottle += 1

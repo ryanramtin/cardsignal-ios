@@ -64,7 +64,7 @@ enum CaptureReadiness: Equatable {
         case .reduceGlare:
             return "Reduce glare"
         case .ready:
-            return "Ready - hold still"
+            return "Locked - auto capture"
         }
     }
 }
