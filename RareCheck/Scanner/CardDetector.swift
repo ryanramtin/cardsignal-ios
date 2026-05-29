@@ -144,7 +144,9 @@ final class CardDetector {
         }
 
         let ciImage = CIImage(cgImage: cgImage)
-        let filter = CIFilter(name: "CIPerspectiveCorrection")!
+        guard let filter = CIFilter(name: "CIPerspectiveCorrection") else {
+            return nil
+        }
         filter.setValue(toImagePoint(observation.topLeft),     forKey: "inputTopLeft")
         filter.setValue(toImagePoint(observation.topRight),    forKey: "inputTopRight")
         filter.setValue(toImagePoint(observation.bottomLeft),  forKey: "inputBottomLeft")

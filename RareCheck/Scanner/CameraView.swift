@@ -144,7 +144,7 @@ struct ScannerContainerView: View {
             }
             // Surface local identification guidance so "thinking → nothing"
             // is not silent when OCR cannot confirm a card.
-            .alert("Scan failed", isPresented: .constant(scannerVM.lastError != nil)) {
+            .alert("Scan failed", isPresented: scanErrorBinding) {
                 Button("OK") { scannerVM.clearErrorAndResumeScanning() }
             } message: {
                 Text(scannerVM.lastError ?? "")
@@ -168,7 +168,7 @@ struct ScannerContainerView: View {
                 PaywallView()
                     .environmentObject(subscriptionManager)
             }
-            .alert("Error", isPresented: .constant(cameraVM.error != nil)) {
+            .alert("Error", isPresented: cameraErrorBinding) {
                 Button("OK") { cameraVM.error = nil }
             } message: {
                 Text(cameraVM.error ?? "")
@@ -188,6 +188,26 @@ struct ScannerContainerView: View {
                 }
             }
             .buttonStyle(.bordered)
+        }
+    }
+
+    private var scanErrorBinding: Binding<Bool> {
+        Binding {
+            scannerVM.lastError != nil
+        } set: { isPresented in
+            if !isPresented {
+                scannerVM.clearErrorAndResumeScanning()
+            }
+        }
+    }
+
+    private var cameraErrorBinding: Binding<Bool> {
+        Binding {
+            cameraVM.error != nil
+        } set: { isPresented in
+            if !isPresented {
+                cameraVM.error = nil
+            }
         }
     }
 
