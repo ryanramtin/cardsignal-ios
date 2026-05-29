@@ -9,6 +9,8 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var isCapturing = false
     @Published var error: String?
     @Published var permissionGranted = false
+    @Published private(set) var isSessionConfigured = false
+    @Published private(set) var isSessionRunning = false
 
     // nonisolated(unsafe): AVCaptureSession is thread-safe for start/stop;
     // we never mutate the reference itself after init.
@@ -16,6 +18,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     private var videoOutput: AVCaptureVideoDataOutput?
     private var cameraDevice: AVCaptureDevice?
+    private var shouldStartAfterConfiguration = false
 
     // Stored nonisolated so the video-queue delegate can call it without
     // crossing actor boundaries. The closure itself must be concurrency-safe.
@@ -46,6 +49,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     // MARK: - Session Setup
 
     func setupSession() async {
+        guard !isSessionConfigured else { return }
         session.beginConfiguration()
         session.sessionPreset = .high
 
@@ -77,9 +81,21 @@ final class CameraViewModel: NSObject, ObservableObject {
 
         session.commitConfiguration()
         alignVideoConnectionsForPortrait()
+        isSessionConfigured = true
+        if shouldStartAfterConfiguration {
+            shouldStartAfterConfiguration = false
+            startSession()
+        }
     }
 
     func startSession() {
+        guard permissionGranted else { return }
+        guard isSessionConfigured else {
+            shouldStartAfterConfiguration = true
+            return
+        }
+        guard !isSessionRunning else { return }
+        isSessionRunning = true
         // Capture session ref locally — safe because session is nonisolated(unsafe)
         let captureSession = session
         Task.detached(priority: .userInitiated) {
@@ -88,6 +104,9 @@ final class CameraViewModel: NSObject, ObservableObject {
     }
 
     func stopSession() {
+        shouldStartAfterConfiguration = false
+        guard isSessionRunning else { return }
+        isSessionRunning = false
         let captureSession = session
         Task.detached(priority: .background) {
             captureSession.stopRunning()
@@ -97,7 +116,14 @@ final class CameraViewModel: NSObject, ObservableObject {
     // MARK: - Capture
 
     func capturePhoto() {
-        guard !isCapturing else { return }
+        guard permissionGranted,
+              isSessionConfigured,
+              isSessionRunning,
+              !isCapturing else { return }
+        guard photoOutput.connection(with: .video) != nil else {
+            error = "Camera is still getting ready. Try again in a moment."
+            return
+        }
         isCapturing = true
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .auto

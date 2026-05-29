@@ -84,7 +84,7 @@ final class CardIdentificationService: ObservableObject {
         // before the actual Pokemon name.
         let lookupImage = cardImage.resizedForRareCheckLookup(maxDimension: 900)
         let compressed = lookupImage.jpegData(compressionQuality: 0.48) ?? Data()
-        let apiCandidates = Array(candidateNames.prefix(4))
+        let apiCandidates = Array(candidateNames.prefix(1))
         print("[RareCheck] Pokemon DB candidates: \(apiCandidates)")
         var apiResponse = CardIdentifyResponse(matches: [], processingTimeMs: 0)
 
@@ -251,7 +251,7 @@ final class CardIdentificationService: ObservableObject {
         if a == b { return 1 }
         let aChars = Array(a)
         let bChars = Array(b)
-        let matchRange = max(aChars.count, bChars.count) / 2 - 1
+        let matchRange = max(0, max(aChars.count, bChars.count) / 2 - 1)
         var aMatches = [Bool](repeating: false, count: aChars.count)
         var bMatches = [Bool](repeating: false, count: bChars.count)
         var matches = 0
@@ -434,6 +434,14 @@ final class LocalCardIndex {
 
     var isUsingBundledSeed: Bool {
         recordCount > 0 && (try? FileManager.default.attributesOfItem(atPath: cacheURL.path)) == nil
+    }
+
+    var isFullIndexAvailable: Bool {
+        recordCount > 0 && !isUsingBundledSeed
+    }
+
+    var cacheUpdatedAt: Date? {
+        (try? FileManager.default.attributesOfItem(atPath: cacheURL.path))?[.modificationDate] as? Date
     }
 
     func searchCards(matching query: String, limit: Int = 80) -> [CardMatch] {
@@ -630,35 +638,65 @@ struct LocalCardRecord: Codable {
 
 private struct PokemonTCGIndexClient {
     private let endpoint = URL(string: "https://api.pokemontcg.io/v2/cards")!
+    private let maxConcurrentPages = 6
 
     func downloadIndex(maxPages: Int, pageSize: Int) async throws -> [LocalCardRecord] {
         let boundedPageSize = min(max(pageSize, 1), 250)
         let boundedPages = min(max(maxPages, 1), 120)
-        var records: [LocalCardRecord] = []
-        var totalCount: Int?
+        let firstPage = try await downloadPage(1, pageSize: boundedPageSize)
+        var records = firstPage.data.compactMap(\.localRecord)
+        let reportedCount = max(firstPage.totalCount ?? records.count, records.count)
+        let totalPages = max(1, min(
+            boundedPages,
+            Int(ceil(Double(reportedCount) / Double(boundedPageSize)))
+        ))
+        let remainingPages = max(0, totalPages - 1)
 
-        for page in 1...boundedPages {
-            var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
-            components.queryItems = [
-                URLQueryItem(name: "page", value: "\(page)"),
-                URLQueryItem(name: "pageSize", value: "\(boundedPageSize)"),
-                URLQueryItem(name: "select", value: "id,name,set,number,rarity,images,tcgplayer")
-            ]
+        guard remainingPages > 0, firstPage.data.count == boundedPageSize else {
+            return records
+        }
 
-            let (data, response) = try await URLSession.shared.data(from: components.url!)
-            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                throw APIError.invalidResponse
+        try await withThrowingTaskGroup(of: [LocalCardRecord].self) { group in
+            var nextPage = 2
+
+            func enqueueNextPage() {
+                guard nextPage <= totalPages else { return }
+                let page = nextPage
+                nextPage += 1
+                group.addTask {
+                    try await downloadPage(page, pageSize: boundedPageSize)
+                        .data
+                        .compactMap(\.localRecord)
+                }
             }
 
-            let decoded = try JSONDecoder().decode(PokemonTCGCardPage.self, from: data)
-            totalCount = decoded.totalCount
-            records += decoded.data.compactMap(\.localRecord)
+            for _ in 0..<min(maxConcurrentPages, remainingPages) {
+                enqueueNextPage()
+            }
 
-            if decoded.data.count < boundedPageSize { break }
-            if let totalCount, records.count >= totalCount { break }
+            while let pageRecords = try await group.next() {
+                records += pageRecords
+                enqueueNextPage()
+            }
         }
 
         return records
+    }
+
+    private func downloadPage(_ page: Int, pageSize: Int) async throws -> PokemonTCGCardPage {
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "pageSize", value: "\(pageSize)"),
+            URLQueryItem(name: "select", value: "id,name,set,number,rarity,images,tcgplayer")
+        ]
+
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(PokemonTCGCardPage.self, from: data)
     }
 }
 
@@ -754,7 +792,7 @@ final class CardScannerViewModel: ObservableObject {
     private var lastDetectedFrame: DetectedCardFrame?
     private var autoCaptureArmed = true
     private let analysisThrottle = 1
-    private let lockThreshold = 2
+    private let lockThreshold = 3
 
     func analyzeFrame(_ buffer: CVPixelBuffer) {
         frameThrottle += 1
@@ -775,7 +813,7 @@ final class CardScannerViewModel: ObservableObject {
             let result = try await identificationService.identify(image: image)
             identificationResult = result
         } catch let scanError as CardIdentificationError {
-            lastError = scanError.errorDescription ?? "Card scan failed."
+            handleScanError(scanError)
             print("[RareCheck] Identification scan gate: \(scanError)")
         } catch let urlError as URLError {
             lastError = "Couldn't reach identification service (\(urlError.code.rawValue)). Backend may be offline."
@@ -799,7 +837,7 @@ final class CardScannerViewModel: ObservableObject {
             let result = try await identificationService.identifyPreparedCard(image: image)
             identificationResult = result
         } catch let scanError as CardIdentificationError {
-            lastError = scanError.errorDescription ?? "Card scan failed."
+            handleScanError(scanError)
             print("[RareCheck] Identification scan gate: \(scanError)")
         } catch let urlError as URLError {
             lastError = "Couldn't reach identification service (\(urlError.code.rawValue)). Backend may be offline."
@@ -837,6 +875,17 @@ final class CardScannerViewModel: ObservableObject {
         lastError = nil
         shouldAutoCapture = false
         autoCaptureArmed = true
+    }
+
+    private func handleScanError(_ scanError: CardIdentificationError) {
+        switch scanError {
+        case .noCardDetected, .noReadableCardText:
+            lastError = nil
+            shouldAutoCapture = false
+            autoCaptureArmed = true
+        case .noConfidentPokemonMatch:
+            lastError = scanError.errorDescription ?? "Card scan failed."
+        }
     }
 
     func applyDetection(_ detectedFrame: DetectedCardFrame?) {
@@ -912,28 +961,9 @@ enum CardIdentificationError: LocalizedError {
             return "No trading card was captured. Align one card inside the frame until the border turns green, then scan again."
         case .noReadableCardText:
             return "I found a card shape, but couldn't read a Pokemon card name. Move closer, reduce glare, and hold steady until READY."
-        case .noConfidentPokemonMatch(let candidates):
-            let names = candidates
-                .compactMap(Self.displayableCandidate)
-                .prefix(3)
-                .joined(separator: ", ")
-            if names.isEmpty {
-                return "I found a card shape, but couldn't read a confident Pokemon card name. Move closer, reduce glare, and center the card name."
-            }
-            return "No confident Pokemon database match found for: \(names). Try moving closer, reducing glare, and centering the card name."
+        case .noConfidentPokemonMatch:
+            return "No confident Pokemon card match yet. Fill the frame with one card, reduce glare, and center the card name before auto capture."
         }
-    }
-
-    private static func displayableCandidate(_ value: String) -> String? {
-        let cleaned = value
-            .replacingOccurrences(of: #"[^A-Za-z0-9 '.:-]"#, with: " ", options: .regularExpression)
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard cleaned.count >= 3, cleaned.count <= 40 else { return nil }
-        guard cleaned.range(of: #"^[0-9 .:-]|^\d+$|\s\d+\b"#, options: .regularExpression) == nil else { return nil }
-        guard cleaned.filter(\.isLetter).count >= 3 else { return nil }
-        return cleaned
     }
 }
 

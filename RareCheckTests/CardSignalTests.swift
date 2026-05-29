@@ -89,7 +89,7 @@ final class RareCheckTests: XCTestCase {
         )
 
         XCTAssertFalse(viewModel.shouldAutoCapture)
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             viewModel.applyDetection(frame)
         }
 
@@ -110,7 +110,7 @@ final class RareCheckTests: XCTestCase {
             confidence: 0.92
         )
 
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
@@ -118,13 +118,13 @@ final class RareCheckTests: XCTestCase {
         viewModel.markCaptureStarted()
         viewModel.lastError = "Try again"
         viewModel.markCaptureFinished()
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             viewModel.applyDetection(frame)
         }
         XCTAssertFalse(viewModel.shouldAutoCapture)
 
         viewModel.clearErrorAndResumeScanning()
-        for _ in 0..<2 {
+        for _ in 0..<3 {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
@@ -188,12 +188,28 @@ final class RareCheckTests: XCTestCase {
     }
 
     func testNoisyOCRCandidatesDoNotLeakIntoScanFailureCopy() {
-        let error = CardIdentificationError.noConfidentPokemonMatch(["- 110", "- 110 G", "jes of 3"])
+        let error = CardIdentificationError.noConfidentPokemonMatch(["- 110", "- 110 G", "jes of 3", "STAGE", "STAGE1"])
         let message = error.errorDescription ?? ""
 
         XCTAssertFalse(message.contains("110"))
         XCTAssertFalse(message.contains("jes of 3"))
+        XCTAssertFalse(message.contains("STAGE"))
         XCTAssertTrue(message.contains("card name"))
+    }
+
+    func testShortOCRSimilarityDoesNotCrashScanner() async throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 96, height: 96)).image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 96, height: 96))
+            UIColor.black.setFill()
+            "A".draw(at: CGPoint(x: 36, y: 36), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 24)])
+        }
+
+        do {
+            _ = try await CardIdentificationService.shared.identifyPreparedCard(image: image)
+        } catch {
+            XCTAssertFalse("\(error)".contains("Range requires lowerBound"))
+        }
     }
 
     func testFreeLimitEnforcement() {

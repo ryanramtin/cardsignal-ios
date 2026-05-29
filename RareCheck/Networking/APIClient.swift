@@ -14,8 +14,8 @@ actor APIClient {
 
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
+        config.timeoutIntervalForRequest = 8
+        config.timeoutIntervalForResource = 12
         return URLSession(configuration: config)
     }()
 

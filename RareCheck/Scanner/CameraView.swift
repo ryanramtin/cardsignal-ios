@@ -34,6 +34,7 @@ struct ScannerContainerView: View {
     @State private var isAutoCapturePending = false
     @State private var capturePulse = false
     @State private var showPaywall = false
+    @State private var autoCaptureTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -68,10 +69,19 @@ struct ScannerContainerView: View {
             .onAppear {
                 cameraVM.startSession()
                 cameraVM.onFrameReady = { [weak scannerVM] buffer in
-                    scannerVM?.analyzeFrame(buffer)
+                    Task { @MainActor in
+                        scannerVM?.analyzeFrame(buffer)
+                    }
                 }
             }
-            .onDisappear { cameraVM.stopSession() }
+            .onDisappear {
+                autoCaptureTask?.cancel()
+                autoCaptureTask = nil
+                isAutoCapturePending = false
+                pendingLockedCapture = false
+                cameraVM.onFrameReady = nil
+                cameraVM.stopSession()
+            }
             // Photo capture is async — kick off identification once the
             // image actually lands in @Published capturedImage, then clear
             // it so the next auto-capture fires a fresh identify().
@@ -116,11 +126,14 @@ struct ScannerContainerView: View {
                     return
                 }
                 isAutoCapturePending = true
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 80_000_000)
+                autoCaptureTask?.cancel()
+                autoCaptureTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 350_000_000)
                     defer { isAutoCapturePending = false }
+                    guard !Task.isCancelled else { return }
                     guard scannerVM.shouldAutoCapture,
                           scannerVM.isLocked,
+                          cameraVM.isSessionRunning,
                           !cameraVM.isCapturing,
                           !scannerVM.isProcessing,
                           capturedPreview == nil else {
@@ -187,6 +200,10 @@ struct ScannerContainerView: View {
         pendingLockedCapture = true
         scannerVM.markCaptureStarted()
         cameraVM.capturePhoto()
+        if !cameraVM.isCapturing {
+            pendingLockedCapture = false
+            scannerVM.markCaptureFinished()
+        }
     }
 }
 

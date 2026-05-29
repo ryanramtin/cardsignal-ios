@@ -108,13 +108,7 @@ struct CardSearchView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                if isRefreshing {
-                    ProgressView("Updating Pokemon DB")
-                        .font(.caption)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
-                        .background(.bar)
-                }
+                pokemonDBStatusBar
             }
             .onAppear(perform: updateResults)
             .onChange(of: query) { _, _ in updateResults() }
@@ -150,7 +144,38 @@ struct CardSearchView: View {
             return "\(recordCount) starter cards cached. Tap refresh to retry the larger Pokemon DB download."
         }
 
-        return "\(recordCount) cards cached for fast local search."
+        return "Full local DB active on this iPhone with \(recordCount) cards."
+    }
+
+    @ViewBuilder
+    private var pokemonDBStatusBar: some View {
+        HStack(spacing: 8) {
+            if isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Updating Pokemon DB on this iPhone")
+            } else if LocalCardIndex.shared.isFullIndexAvailable {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text("Full local DB: \(recordCount) cards on this iPhone")
+            } else if recordCount > 0 {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(.orange)
+                Text("Starter DB: \(recordCount) cards. Tap refresh for full local DB.")
+            } else {
+                Image(systemName: "exclamationmark.circle")
+                    .foregroundStyle(.orange)
+                Text("Pokemon DB not cached yet")
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
     }
 }
 
