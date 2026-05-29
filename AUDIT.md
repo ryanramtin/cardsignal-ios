@@ -94,9 +94,11 @@ Both mockups show character-led notification cards (Pikachu/Charizard/Mewtwo/Eev
 
 **Recommended:** Commission or generate "RareCheck mascot squad" — original cute critters in the same archetype slots (electric mouse, water turtle, fire lizard, ghost, etc.). Cheap option: use SF Symbols (`bolt.circle.fill`, etc.) as placeholders for v1 internal builds, swap to original mascots before TestFlight.
 
-### 8. RevenueCat placeholder key
+### 8. RevenueCat App Store configuration
 
-`RareCheckApp.swift:23` ships with `"appl_REPLACE_WITH_YOUR_REVENUECAT_KEY"`. App will crash on first launch in production. Needs a real RevenueCat account + key + product IDs (`com.appgumbo.rarecheck.pro.monthly`, `com.appgumbo.rarecheck.pro.annual`) in ASC.
+Current code reads `REVENUECAT_API_KEY` from `Info.plist` and `SubscriptionManager` safely skips RevenueCat setup when the key is missing or still an unresolved build setting. This avoids the old first-launch crash risk.
+
+Still required for App Store/TestFlight purchase readiness: configure a real RevenueCat public SDK key in signing/build settings and verify product IDs (`com.appgumbo.rarecheck.pro.monthly`, `com.appgumbo.rarecheck.pro.annual`) in RevenueCat and App Store Connect.
 
 ### 9. ✅ File-name vs. struct-name mismatch — RESOLVED
 
@@ -144,7 +146,7 @@ Weeks 2+: Notifications, Watchlist, Price Alerts, Compare, Grading Guide, Market
 
 | File | Change |
 |---|---|
-| `RareCheck/App/RareCheckApp.swift` → `RareCheckApp.swift` | Rename file. Replace placeholder RevenueCat key with `Bundle.main.object(forInfoDictionaryKey: "REVENUECAT_API_KEY")` reading from Info.plist (committed via `.xcconfig`, not source). |
+| `RareCheck/App/RareCheckApp.swift` | RevenueCat placeholder crash risk is resolved; still needs real `REVENUECAT_API_KEY` build setting for purchase UAT/TestFlight. |
 | `RareCheck/App/ContentView.swift` | Replace 3-tab TabView with `AppMode` dispatch. New `KidRootView` and `AdultRootView`. |
 | **NEW** `RareCheck/App/AppMode.swift` | `enum AppMode: String, Codable { case kid, adult }` + `@AppStorage("appMode")` wrapper. |
 | **NEW** `RareCheck/App/KidRootView.swift` | 3-tab bar (Scan/Collection/Profile). |
