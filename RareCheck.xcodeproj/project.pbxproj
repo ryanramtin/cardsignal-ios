@@ -12,6 +12,7 @@
 		185ABAAD54FAF615BECECBDA /* RareCheck.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 0341A61B5CD5511CD0635C76 /* RareCheck.xcdatamodeld */; };
 		256542D2F21A58A5E7BD6EDA /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3E1297E9E48247F73B74BC /* PaywallView.swift */; };
 		4CD3F24C6DA02BD0B27BE910 /* rarecheck_card_index_seed.json in Resources */ = {isa = PBXBuildFile; fileRef = AC5696B66C3359BA380B019D /* rarecheck_card_index_seed.json */; };
+		4F1B7C2D9E8A6B5C3D2E1F0A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2B8A6C4E0F1D3B5A7C9E2D4F /* PrivacyInfo.xcprivacy */; };
 		6658C2A5D4152D2BAD0805E7 /* SubscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBBD2F4B40867AAAC0274960 /* SubscriptionManager.swift */; };
 		6AD5A88EA4824DDF1EC15290 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F7FB008BC210F7A2F05A9A /* APIClient.swift */; };
 		6CF06DFC21FD50E601C3962C /* OCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C475F2287A031D1F4A339BF /* OCRService.swift */; };
@@ -49,6 +50,7 @@
 		17495AF4E04401D63849A395 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		23AED91678A757EDEEE2400F /* ScanFlowSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanFlowSmokeTests.swift; sourceTree = "<group>"; };
 		23C785804290248FC3CD3703 /* CardModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardModels.swift; sourceTree = "<group>"; };
+		2B8A6C4E0F1D3B5A7C9E2D4F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		2C65D43657C6FB1B91B7654B /* CollectionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionViewModel.swift; sourceTree = "<group>"; };
 		3ADC79BDA023AEF589F14D76 /* PHashMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PHashMatcher.swift; sourceTree = "<group>"; };
 		4C3E1297E9E48247F73B74BC /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
@@ -156,6 +158,7 @@
 			children = (
 				60E492D30C370049437E4301 /* Assets.xcassets */,
 				9C047D88194EF51503DE2D77 /* Info.plist */,
+				2B8A6C4E0F1D3B5A7C9E2D4F /* PrivacyInfo.xcprivacy */,
 				AC5696B66C3359BA380B019D /* rarecheck_card_index_seed.json */,
 			);
 			path = Resources;
@@ -307,6 +310,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E088C005372DE5942EEEFAB5 /* Assets.xcassets in Resources */,
+				4F1B7C2D9E8A6B5C3D2E1F0A /* PrivacyInfo.xcprivacy in Resources */,
 				4CD3F24C6DA02BD0B27BE910 /* rarecheck_card_index_seed.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
