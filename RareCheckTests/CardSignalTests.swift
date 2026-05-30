@@ -129,6 +129,38 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(controller.collectionCount(), 1)
     }
 
+    func testMetadataOnlySaveStoresGeneratedCollectionArtworkURL() throws {
+        let controller = PersistenceController(inMemory: true)
+        let metadataMatch = CardMatch(id: "", name: "Galarian Mr. Mime", setName: "Sword & Shield",
+                                      setCode: "swsh1", collectorNumber: "48", rarity: "Common",
+                                      imageURL: "", confidence: 0.82, price: .zero)
+
+        let outcome = controller.saveCard(metadataMatch)
+
+        XCTAssertEqual(outcome, .inserted)
+        let request: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
+        let saved = try XCTUnwrap(controller.container.viewContext.fetch(request).first)
+        XCTAssertEqual(saved.imageURL, "https://images.pokemontcg.io/swsh1/48.png")
+        XCTAssertTrue(PersistenceController.isDisplayableCollectionCard(saved))
+        XCTAssertNotNil(saved.preferredDisplayImageURL)
+    }
+
+    func testValidReturnedImageURLIsPreservedForCollectionArtwork() throws {
+        let controller = PersistenceController(inMemory: true)
+        let match = CardMatch(id: "swsh1-48", name: "Galarian Mr. Mime", setName: "Sword & Shield",
+                              setCode: "swsh1", collectorNumber: "48", rarity: "Common",
+                              imageURL: "https://cdn.example.com/cards/mime.png",
+                              confidence: 0.91, price: .zero)
+
+        let outcome = controller.saveCard(match)
+
+        XCTAssertEqual(outcome, .inserted)
+        let request: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
+        let saved = try XCTUnwrap(controller.container.viewContext.fetch(request).first)
+        XCTAssertEqual(saved.imageURL, "https://cdn.example.com/cards/mime.png")
+        XCTAssertTrue(PersistenceController.isDisplayableCollectionCard(saved))
+    }
+
     func testScanSaveTrimsPayloadAndKeepsLibraryCardVisible() throws {
         let controller = PersistenceController(inMemory: true)
         let match = CardMatch(id: "  ", name: "  Galarian Mr. Mime  ", setName: "  Sword & Shield  ",

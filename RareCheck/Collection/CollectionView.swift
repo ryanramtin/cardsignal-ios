@@ -227,12 +227,7 @@ struct CollectionCardTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            AsyncImage(url: card.preferredDisplayImageURL) { img in
-                img.resizable().aspectRatio(contentMode: .fit)
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 8).fill(.secondary.opacity(0.15))
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            CollectionArtwork(card: card, cornerRadius: 8)
             .aspectRatio(5/7, contentMode: .fit)
 
             Text(card.name ?? "Unknown").font(.caption).fontWeight(.semibold).lineLimit(1)
@@ -252,13 +247,8 @@ struct CollectionListRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            AsyncImage(url: card.preferredDisplayImageURL) { img in
-                img.resizable().aspectRatio(contentMode: .fit)
-            } placeholder: {
-                RoundedRectangle(cornerRadius: 4).fill(.secondary.opacity(0.15))
-            }
+            CollectionArtwork(card: card, cornerRadius: 4)
             .frame(width: 44, height: 62)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(card.name ?? "").font(.subheadline).fontWeight(.semibold)
@@ -269,6 +259,66 @@ struct CollectionListRow: View {
             Spacer()
             Text("$\(String(format: "%.2f", card.currentPriceMarket))")
                 .font(.subheadline).fontWeight(.semibold).foregroundStyle(.green)
+        }
+    }
+}
+
+private struct CollectionArtwork: View {
+    let card: SavedCard
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        AsyncImage(url: card.preferredDisplayImageURL) { phase in
+            switch phase {
+            case .empty:
+                fallback(isLoading: true)
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.black.opacity(0.03))
+            case .failure:
+                fallback(isLoading: false)
+            @unknown default:
+                fallback(isLoading: false)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .accessibilityLabel(card.name ?? "Pokemon card")
+    }
+
+    private func fallback(isLoading: Bool) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.red.opacity(0.18), Color.orange.opacity(0.10), Color.blue.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(.secondary.opacity(0.25), lineWidth: 1)
+
+            VStack(spacing: 5) {
+                Image(systemName: isLoading ? "photo" : "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(card.name?.isEmpty == false ? card.name ?? "Pokemon" : "Pokemon")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 4)
+                if let number = card.collectorNumber, !number.isEmpty {
+                    Text("#\(number)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(6)
         }
     }
 }

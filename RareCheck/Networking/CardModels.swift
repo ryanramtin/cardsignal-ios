@@ -71,17 +71,27 @@ struct CardMatch: Codable, Identifiable, Hashable {
     }
     var preferredCollectionImageURL: String {
         let cleaned = imageURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        if cleaned.contains("images.pokemontcg.io") {
+        if Self.isUsableImageURL(cleaned) {
             return cleaned
         }
 
-        let setComponent = setCode.isEmpty ? id.split(separator: "-").first.map(String.init) ?? "" : setCode
-        let numberComponent = collectorNumber.isEmpty ? id.split(separator: "-").dropFirst().first.map(String.init) ?? "" : collectorNumber
-        if !setComponent.isEmpty, !numberComponent.isEmpty {
-            return "https://images.pokemontcg.io/\(setComponent)/\(numberComponent)_hires.png"
+        let idComponents = id.split(separator: "-", maxSplits: 1).map(String.init)
+        let setComponent = (setCode.isEmpty ? idComponents.first ?? "" : setCode)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let numberComponent = (collectorNumber.isEmpty ? idComponents.dropFirst().first ?? "" : collectorNumber)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: "/")
+            .first
+            .map(String.init) ?? ""
+
+        guard !setComponent.isEmpty,
+              !numberComponent.isEmpty,
+              let encodedSet = setComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let encodedNumber = numberComponent.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) else {
+            return cleaned
         }
 
-        return cleaned
+        return "https://images.pokemontcg.io/\(encodedSet)/\(encodedNumber).png"
     }
 
     enum CodingKeys: String, CodingKey {
