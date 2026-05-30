@@ -93,14 +93,24 @@ open RareCheck.xcodeproj
 ### RevenueCat Configuration
 
 1. Create a RevenueCat account at [revenuecat.com](https://www.revenuecat.com)
-2. Add your API key in `RareCheckApp.swift`:
-   ```swift
-   Purchases.configure(withAPIKey: "YOUR_KEY_HERE")
+2. Add the public iOS SDK key as a build setting named `REVENUECAT_API_KEY`. Do not hard-code it in Swift source. For local device/TestFlight builds, pass it through Xcode or `xcodebuild`:
+   ```bash
+   xcodebuild \
+     -project RareCheck.xcodeproj \
+     -scheme RareCheck \
+     -configuration Release \
+     -destination "generic/platform=iOS" \
+     REVENUECAT_API_KEY="appl_your_public_ios_sdk_key" \
+     build
    ```
-3. Create products in App Store Connect:
+3. Create products in App Store Connect and RevenueCat:
    - Monthly: `com.appgumbo.rarecheck.pro.monthly` ($4.99/mo)
    - Annual: `com.appgumbo.rarecheck.pro.annual` ($19.99/yr)
-4. Set entitlement ID `"pro"` in RevenueCat dashboard
+4. Attach both products to the current RevenueCat offering.
+5. Set entitlement ID `"pro"` in the RevenueCat dashboard.
+6. Verify sandbox/TestFlight purchase and restore on a physical iPhone before App Store submission.
+
+If `REVENUECAT_API_KEY` is missing, blank, a placeholder, or unresolved as `$(REVENUECAT_API_KEY)`, the app intentionally shows "Purchases unavailable" instead of attempting a broken purchase flow.
 
 ### Backend
 
