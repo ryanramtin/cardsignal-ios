@@ -301,16 +301,35 @@ final class CardIdentificationService: ObservableObject {
         let lines = ([name].compactMap { $0 } + rawText.components(separatedBy: .newlines))
             .map(normalizedCardText)
             .filter { !$0.isEmpty }
-        let types = ["grass", "fire", "water", "lightning", "psychic", "fighting", "darkness", "metal", "fairy", "dragon"]
+        let energyTypeAliases: [(canonical: String, aliases: [String])] = [
+            ("grass", ["grass", "leaf"]),
+            ("fire", ["fire"]),
+            ("water", ["water"]),
+            ("lightning", ["lightning", "electric", "electricity"]),
+            ("psychic", ["psychic"]),
+            ("fighting", ["fighting"]),
+            ("darkness", ["darkness", "dark"]),
+            ("metal", ["metal", "steel"]),
+            ("fairy", ["fairy"]),
+            ("dragon", ["dragon"])
+        ]
 
         for line in lines {
-            for type in types where line.range(of: #"(^|\b)(basic )?\#(type) energy($|\b)"#, options: .regularExpression) != nil {
-                return "\(type) energy"
+            for type in energyTypeAliases {
+                for alias in type.aliases where line.range(of: #"(^|\b)(basic )?\#(alias) energy($|\b)"#, options: .regularExpression) != nil {
+                    return "\(type.canonical) energy"
+                }
             }
         }
 
-        if lines.contains("basic energy") {
-            return "basic energy"
+        let lineSet = Set(lines)
+        if lineSet.contains("basic"), lineSet.contains("energy") {
+            let splitTypeMatches = energyTypeAliases.filter { type in
+                type.aliases.contains { lineSet.contains($0) }
+            }
+            if splitTypeMatches.count == 1 {
+                return "\(splitTypeMatches[0].canonical) energy"
+            }
         }
         return nil
     }
@@ -926,6 +945,15 @@ final class CardScannerViewModel: ObservableObject {
     }
 
     func clearErrorAndResumeScanning() {
+        lastError = nil
+        scanGuidance = nil
+        shouldAutoCapture = false
+        autoCaptureArmed = true
+        autoCaptureCooldownUntil = Date.distantPast
+    }
+
+    func resumeScanningAfterResultDismissal() {
+        identificationResult = nil
         lastError = nil
         scanGuidance = nil
         shouldAutoCapture = false

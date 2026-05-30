@@ -317,6 +317,24 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(query, "fire energy")
     }
 
+    func testSplitEnergyOCRUsesTypeLineAndEnergyLine() {
+        let query = CardIdentificationService.energyLookupQuery(
+            rawText: "Basic\nElectric\nEnergy",
+            name: "Energy"
+        )
+
+        XCTAssertEqual(query, "lightning energy")
+    }
+
+    func testDarkEnergyOCRMapsToDarknessEnergy() {
+        let query = CardIdentificationService.energyLookupQuery(
+            rawText: "Dark Energy",
+            name: "Dark Energy"
+        )
+
+        XCTAssertEqual(query, "darkness energy")
+    }
+
     func testGenericEnergyOCRDoesNotPickRandomEnergyNamedCard() {
         let query = CardIdentificationService.energyLookupQuery(
             rawText: "ENERGY\nRetreat\nWeakness",
@@ -324,6 +342,40 @@ final class RareCheckTests: XCTestCase {
         )
 
         XCTAssertNil(query)
+    }
+
+    func testResultDismissalRearmsAutoCapture() {
+        let viewModel = CardScannerViewModel()
+        let frame = DetectedCardFrame(
+            boundingBox: CGRect(x: 0.18, y: 0.22, width: 0.56, height: 0.72),
+            confidence: 0.92
+        )
+
+        for _ in 0..<18 {
+            viewModel.applyDetection(frame)
+        }
+        XCTAssertTrue(viewModel.shouldAutoCapture)
+
+        viewModel.markCaptureStarted()
+        viewModel.identificationResult = IdentificationResult(
+            matches: [
+                CardMatch(id: "base1-58", name: "Pikachu", setName: "Base",
+                          setCode: "base1", collectorNumber: "58", rarity: "Common",
+                          imageURL: "https://images.pokemontcg.io/base1/58.png",
+                          confidence: 0.95, price: .zero)
+            ],
+            source: .local,
+            processingTimeMs: 12
+        )
+        viewModel.markCaptureFinished()
+        XCTAssertFalse(viewModel.shouldAutoCapture)
+
+        viewModel.resumeScanningAfterResultDismissal()
+        for _ in 0..<18 {
+            viewModel.applyDetection(frame)
+        }
+
+        XCTAssertTrue(viewModel.shouldAutoCapture)
     }
 
     func testLocalSearchFindsBundledSeedCardByName() {

@@ -170,7 +170,7 @@ struct ScannerContainerView: View {
                 })
                 .environmentObject(subscriptionManager)
                 .onDisappear {
-                    scannerVM.identificationResult = nil
+                    scannerVM.resumeScanningAfterResultDismissal()
                     resultCapture = nil
                 }
             }
