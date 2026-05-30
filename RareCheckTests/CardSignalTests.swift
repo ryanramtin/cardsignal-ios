@@ -122,6 +122,44 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(saved.imageURL, "https://images.pokemontcg.io/swsh1/48_hires.png")
     }
 
+    func testPruneInvalidCollectionCardsRemovesExistingBlankRows() throws {
+        let controller = PersistenceController(inMemory: true)
+        let ctx = controller.container.viewContext
+        let entity = NSEntityDescription.entity(forEntityName: "SavedCard", in: ctx)!
+
+        let blank = SavedCard(entity: entity, insertInto: ctx)
+        blank.id = UUID()
+        blank.cardId = ""
+        blank.name = "   "
+        blank.imageURL = ""
+        blank.addedAt = Date()
+
+        let nameOnly = SavedCard(entity: entity, insertInto: ctx)
+        nameOnly.id = UUID()
+        nameOnly.cardId = "bad-name-only"
+        nameOnly.name = "Galarian Mr. Mime"
+        nameOnly.imageURL = ""
+        nameOnly.addedAt = Date()
+
+        let valid = SavedCard(entity: entity, insertInto: ctx)
+        valid.id = UUID()
+        valid.cardId = "swsh1-48"
+        valid.name = "Galarian Mr. Mime"
+        valid.setCode = "swsh1"
+        valid.collectorNumber = "48"
+        valid.imageURL = "https://images.pokemontcg.io/swsh1/48_hires.png"
+        valid.addedAt = Date()
+
+        try ctx.save()
+
+        XCTAssertEqual(controller.pruneInvalidCollectionCards(), 2)
+        XCTAssertEqual(controller.collectionCount(), 1)
+
+        let request: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
+        let savedCards = try ctx.fetch(request)
+        XCTAssertEqual(savedCards.map { $0.name }, ["Galarian Mr. Mime"])
+    }
+
     func testStableLockedFramesArmAutoCapture() {
         let viewModel = CardScannerViewModel()
         let frame = DetectedCardFrame(
@@ -265,9 +303,27 @@ final class RareCheckTests: XCTestCase {
         }
         viewModel.applyDetection(jitteredFrame)
 
-        XCTAssertTrue(viewModel.isFramed)
+        XCTAssertFalse(viewModel.isFramed)
         XCTAssertFalse(viewModel.isLocked)
         XCTAssertFalse(viewModel.shouldAutoCapture)
+    }
+
+    func testEnergyOCRUsesEnergyLookupInsteadOfGenericRescueNames() {
+        let query = CardIdentificationService.energyLookupQuery(
+            rawText: "Basic\nFire Energy\nENERGY",
+            name: "Fire Energy"
+        )
+
+        XCTAssertEqual(query, "fire energy")
+    }
+
+    func testGenericEnergyOCRDoesNotPickRandomEnergyNamedCard() {
+        let query = CardIdentificationService.energyLookupQuery(
+            rawText: "ENERGY\nRetreat\nWeakness",
+            name: "Energy"
+        )
+
+        XCTAssertNil(query)
     }
 
     func testLocalSearchFindsBundledSeedCardByName() {

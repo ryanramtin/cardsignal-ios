@@ -116,11 +116,36 @@ final class PersistenceController: ObservableObject {
         try? container.viewContext.save()
     }
 
+    // MARK: - Collection Cleanup
+
+    static func isDisplayableCollectionCard(_ card: SavedCard) -> Bool {
+        let name = (card.name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return false }
+
+        let imageURL = (card.imageURL ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let setCode = (card.setCode ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let collectorNumber = (card.collectorNumber ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return !imageURL.isEmpty || (!setCode.isEmpty && !collectorNumber.isEmpty)
+    }
+
+    @discardableResult
+    func pruneInvalidCollectionCards() -> Int {
+        let req: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
+        let cards = (try? container.viewContext.fetch(req)) ?? []
+        let invalidCards = cards.filter { !Self.isDisplayableCollectionCard($0) }
+        guard !invalidCards.isEmpty else { return 0 }
+
+        invalidCards.forEach { container.viewContext.delete($0) }
+        try? container.viewContext.save()
+        return invalidCards.count
+    }
+
     // MARK: - Collection Count
 
     func collectionCount() -> Int {
         let req: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
-        return (try? container.viewContext.count(for: req)) ?? 0
+        let cards = (try? container.viewContext.fetch(req)) ?? []
+        return cards.filter { Self.isDisplayableCollectionCard($0) }.count
     }
 
     func isAtFreeLimit() -> Bool {
@@ -132,7 +157,8 @@ final class PersistenceController: ObservableObject {
     func exportCSV() -> String {
         let req: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
         req.sortDescriptors = [NSSortDescriptor(key: "addedAt", ascending: false)]
-        let cards = (try? container.viewContext.fetch(req)) ?? []
+        let cards = ((try? container.viewContext.fetch(req)) ?? [])
+            .filter { Self.isDisplayableCollectionCard($0) }
 
         var csv = "Name,Set,Set Code,Collector #,Rarity,Market Price,Low,Mid,High,Added\n"
         let df = ISO8601DateFormatter()

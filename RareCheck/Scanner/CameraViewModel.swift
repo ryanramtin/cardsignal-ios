@@ -9,6 +9,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     @Published var isCapturing = false
     @Published var error: String?
     @Published var permissionGranted = false
+    @Published var isPermissionResolved = false
     @Published private(set) var isSessionConfigured = false
     @Published private(set) var isSessionRunning = false
 
@@ -36,13 +37,16 @@ final class CameraViewModel: NSObject, ObservableObject {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             permissionGranted = true
+            isPermissionResolved = true
             await setupSession()
         case .notDetermined:
             let granted = await AVCaptureDevice.requestAccess(for: .video)
             permissionGranted = granted
+            isPermissionResolved = true
             if granted { await setupSession() }
         default:
             permissionGranted = false
+            isPermissionResolved = true
             error = "Camera access denied. Please enable in Settings."
         }
     }
@@ -93,7 +97,10 @@ final class CameraViewModel: NSObject, ObservableObject {
     }
 
     func startSession() {
-        guard permissionGranted else { return }
+        guard permissionGranted else {
+            shouldStartAfterConfiguration = true
+            return
+        }
         guard isSessionConfigured else {
             shouldStartAfterConfiguration = true
             return

@@ -46,6 +46,12 @@ final class CardIdentificationService: ObservableObject {
         // path still computes pHash, but normal on-device scans avoid that
         // extra image work so capture feedback stays snappy.
         let ocr = try await ocrService.extractCardInfo(from: cardImage)
+        if let energyQuery = Self.energyLookupQuery(from: ocr),
+           let energyMatches = LocalCardIndex.shared.energyMatches(matching: energyQuery),
+           !energyMatches.isEmpty {
+            let ms = Int(Date().timeIntervalSince(start) * 1000)
+            return IdentificationResult(matches: energyMatches, source: .local, processingTimeMs: ms)
+        }
         let hash = LocalCardIndex.shared.isFullIndexAvailable ? nil : pHashMatcher.hash(of: cardImage)
         let candidateNames = fallbackNameCandidates(from: ocr)
         let localRescueMatches = LocalCardIndex.shared.bestOCRRescueMatches(
@@ -287,6 +293,28 @@ final class CardIdentificationService: ObservableObject {
             .lowercased()
     }
 
+    static func energyLookupQuery(from ocr: OCRCardInfo) -> String? {
+        energyLookupQuery(rawText: ocr.rawText, name: ocr.name)
+    }
+
+    static func energyLookupQuery(rawText: String, name: String?) -> String? {
+        let lines = ([name].compactMap { $0 } + rawText.components(separatedBy: .newlines))
+            .map(normalizedCardText)
+            .filter { !$0.isEmpty }
+        let types = ["grass", "fire", "water", "lightning", "psychic", "fighting", "darkness", "metal", "fairy", "dragon"]
+
+        for line in lines {
+            for type in types where line.range(of: #"(^|\b)(basic )?\#(type) energy($|\b)"#, options: .regularExpression) != nil {
+                return "\(type) energy"
+            }
+        }
+
+        if lines.contains("basic energy") {
+            return "basic energy"
+        }
+        return nil
+    }
+
     private func cleanNameCandidate(_ value: String) -> String? {
         let cleaned = value
             .replacingOccurrences(of: #"[^A-Za-z0-9 '.:-]"#, with: " ", options: .regularExpression)
@@ -469,6 +497,45 @@ final class LocalCardIndex {
                     price: item.record.lastKnownPrice ?? .zero
                 )
             }
+    }
+
+    func energyMatches(matching query: String, limit: Int = 6) -> [CardMatch]? {
+        let normalizedQuery = Self.normalizedSearchText(query)
+        guard !normalizedQuery.isEmpty else { return nil }
+        let isGenericBasicEnergy = normalizedQuery == "basic energy"
+
+        let matches = searchCards(matching: query, limit: 40)
+            .filter { match in
+                let name = Self.normalizedSearchText(match.name)
+                guard name.hasSuffix("energy") else { return false }
+                guard !name.contains("search"),
+                      !name.contains("switch"),
+                      !name.contains("coin"),
+                      !name.contains("retrieval"),
+                      !name.contains("recycler") else {
+                    return false
+                }
+                if isGenericBasicEnergy {
+                    return name == "basic energy" || (name.hasPrefix("basic ") && name.hasSuffix(" energy"))
+                }
+                return name == normalizedQuery || name == "basic \(normalizedQuery)"
+            }
+            .prefix(limit)
+            .map { match in
+                CardMatch(
+                    id: match.id,
+                    name: match.name,
+                    setName: match.setName,
+                    setCode: match.setCode,
+                    collectorNumber: match.collectorNumber,
+                    rarity: match.rarity,
+                    imageURL: match.imageURL,
+                    confidence: 0.88,
+                    price: match.price
+                )
+            }
+
+        return matches.isEmpty ? nil : matches
     }
 
     func bestOCRRescueMatches(

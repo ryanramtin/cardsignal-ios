@@ -23,6 +23,7 @@ struct CollectionView: View {
 
     private var filteredCards: [SavedCard] {
         cards.filter { card in
+            guard PersistenceController.isDisplayableCollectionCard(card) else { return false }
             let matchesSearch = viewModel.searchText.isEmpty ||
                 (card.name ?? "").localizedCaseInsensitiveContains(viewModel.searchText) ||
                 (card.setName ?? "").localizedCaseInsensitiveContains(viewModel.searchText)
@@ -42,7 +43,7 @@ struct CollectionView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if cards.isEmpty {
+                if filteredCards.isEmpty {
                     emptyState
                 } else {
                     VStack(spacing: 0) {
@@ -72,6 +73,9 @@ struct CollectionView: View {
                 ShareSheet(text: viewModel.csvContent)
             }
             .sheet(isPresented: $showPaywall) { PaywallView() }
+            .task {
+                PersistenceController.shared.pruneInvalidCollectionCards()
+            }
             .safeAreaInset(edge: .top) {
                 if let visibleSaveNotice {
                     saveNoticeBanner(visibleSaveNotice)
@@ -108,7 +112,7 @@ struct CollectionView: View {
             statItem(title: "Total Value", value: "$\(String(format: "%.2f", viewModel.totalValue(cards: filteredCards)))")
             Divider().frame(height: 30)
             statItem(title: "Limit",
-                     value: subscriptionManager.isPro ? "Unlimited" : "\(cards.count)/\(PersistenceController.freeCollectionLimit)")
+                     value: subscriptionManager.isPro ? "Unlimited" : "\(filteredCards.count)/\(PersistenceController.freeCollectionLimit)")
         }
         .padding(.vertical, 10)
         .padding(.horizontal)

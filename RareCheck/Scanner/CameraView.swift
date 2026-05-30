@@ -60,8 +60,10 @@ struct ScannerContainerView: View {
                         capturedImage: capturedPreview,
                         scanGuidance: scannerVM.scanGuidance
                     )
-                } else {
+                } else if cameraVM.isPermissionResolved {
                     permissionDeniedView
+                } else {
+                    cameraStartingView
                 }
             }
             .navigationTitle("Scan Card")
@@ -143,6 +145,11 @@ struct ScannerContainerView: View {
                     triggerCapture()
                 }
             }
+            .onChange(of: cameraVM.permissionGranted) { _, granted in
+                if granted {
+                    cameraVM.startSession()
+                }
+            }
             // Surface local identification guidance so "thinking → nothing"
             // is not silent when OCR cannot confirm a card.
             .alert("Scan failed", isPresented: scanErrorBinding) {
@@ -191,6 +198,16 @@ struct ScannerContainerView: View {
                 }
             }
             .buttonStyle(.bordered)
+        }
+    }
+
+    private var cameraStartingView: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+                .tint(.white)
+            Text("Starting camera...")
+                .font(.headline)
+                .foregroundStyle(.white)
         }
     }
 
@@ -405,7 +422,7 @@ struct CardFinderOverlay: View {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
                 HStack(spacing: 8) {
                     RotatingPokeballView()
-                    Text("Searching Pokemon DB \(max(0, Int(context.date.timeIntervalSince(searchStartDate))))s")
+                    Text("Searching Pokemon DB \(max(1, Int(ceil(context.date.timeIntervalSince(searchStartDate)))))s")
                 }
             }
         } else {
