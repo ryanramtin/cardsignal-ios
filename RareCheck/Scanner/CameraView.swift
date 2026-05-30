@@ -155,6 +155,8 @@ struct ScannerContainerView: View {
                     let outcome = scannerVM.saveCard(card, isPro: subscriptionManager.isPro)
                     if outcome == .limitReached {
                         showPaywall = true
+                    } else if outcome == .invalidCard {
+                        scannerVM.lastError = "Scan result was incomplete. Try scanning again."
                     } else {
                         appNavigation.showCollection(for: card.name, outcome: outcome)
                     }
@@ -620,6 +622,7 @@ struct CardMatchRow: View {
                 Button(action: onSave) {
                     Image(systemName: "plus.circle.fill").foregroundStyle(.red)
                 }
+                .disabled(!match.canSaveToCollection)
                 Button(action: onDetail) {
                     Image(systemName: "chevron.right").foregroundStyle(.secondary)
                 }

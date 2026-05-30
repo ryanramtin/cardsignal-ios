@@ -14,6 +14,43 @@ struct CardMatch: Codable, Identifiable, Hashable {
     let price: PriceData
 
     var confidencePercent: Int { Int(confidence * 100) }
+    var canSaveToCollection: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var persistenceReady: CardMatch? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+
+        let trimmedSetCode = setCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCollectorNumber = collectorNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedID: String
+        if !trimmedID.isEmpty {
+            resolvedID = trimmedID
+        } else if !trimmedSetCode.isEmpty, !trimmedCollectorNumber.isEmpty {
+            resolvedID = "\(trimmedSetCode)-\(trimmedCollectorNumber)"
+        } else {
+            resolvedID = trimmedName
+                .lowercased()
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+                .joined(separator: "-")
+        }
+
+        return CardMatch(
+            id: resolvedID,
+            name: trimmedName,
+            setName: setName.trimmingCharacters(in: .whitespacesAndNewlines),
+            setCode: trimmedSetCode,
+            collectorNumber: trimmedCollectorNumber,
+            rarity: rarity.trimmingCharacters(in: .whitespacesAndNewlines),
+            imageURL: imageURL.trimmingCharacters(in: .whitespacesAndNewlines),
+            confidence: confidence,
+            price: price
+        )
+    }
+
     var preferredDisplayImageURL: URL? {
         URL(string: preferredCollectionImageURL)
     }

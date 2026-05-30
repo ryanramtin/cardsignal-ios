@@ -81,6 +81,35 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(saved.imageURL, dbMatch.imageURL)
     }
 
+    func testBlankScanMatchIsNotSavedToCollection() {
+        let controller = PersistenceController(inMemory: true)
+        let blankMatch = CardMatch(id: "", name: "   ", setName: "", setCode: "",
+                                   collectorNumber: "", rarity: "", imageURL: "",
+                                   confidence: 0.0, price: .zero)
+
+        let outcome = controller.saveCard(blankMatch)
+
+        XCTAssertEqual(outcome, .invalidCard)
+        XCTAssertEqual(controller.collectionCount(), 0)
+    }
+
+    func testScanSaveTrimsPayloadAndKeepsLibraryCardVisible() throws {
+        let controller = PersistenceController(inMemory: true)
+        let match = CardMatch(id: "  ", name: "  Galarian Mr. Mime  ", setName: "  Sword & Shield  ",
+                              setCode: "swsh1", collectorNumber: " 48 ", rarity: " Common ",
+                              imageURL: " https://images.pokemontcg.io/swsh1/48_hires.png ",
+                              confidence: 0.82, price: .zero)
+
+        let outcome = controller.saveCard(match)
+
+        XCTAssertEqual(outcome, .inserted)
+        let request: NSFetchRequest<SavedCard> = NSFetchRequest<SavedCard>(entityName: "SavedCard")
+        let saved = try XCTUnwrap(controller.container.viewContext.fetch(request).first)
+        XCTAssertEqual(saved.name, "Galarian Mr. Mime")
+        XCTAssertEqual(saved.cardId, "swsh1-48")
+        XCTAssertEqual(saved.imageURL, "https://images.pokemontcg.io/swsh1/48_hires.png")
+    }
+
     func testStableLockedFramesArmAutoCapture() {
         let viewModel = CardScannerViewModel()
         let frame = DetectedCardFrame(

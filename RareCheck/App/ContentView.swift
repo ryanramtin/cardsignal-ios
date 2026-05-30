@@ -21,6 +21,8 @@ final class AppNavigationState: ObservableObject {
                 return "\(cardName) refreshed in your collection"
             case .limitReached:
                 return "Upgrade to Pro to save more than \(PersistenceController.freeCollectionLimit) cards"
+            case .invalidCard:
+                return "Scan result was incomplete. Try scanning again."
             }
         }
     }

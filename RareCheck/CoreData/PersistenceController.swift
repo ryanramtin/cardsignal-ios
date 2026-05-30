@@ -11,6 +11,7 @@ final class PersistenceController: ObservableObject {
         case inserted
         case updated
         case limitReached
+        case invalidCard
     }
 
     let container: NSPersistentContainer
@@ -51,6 +52,11 @@ final class PersistenceController: ObservableObject {
 
     @discardableResult
     func saveCard(_ card: CardMatch, isPro: Bool = false) -> SaveOutcome {
+        guard let card = card.persistenceReady else {
+            print("[RareCheck] Refusing to save blank card match: id=\(card.id)")
+            return .invalidCard
+        }
+
         let ctx = container.viewContext
 
         // Existing saves should be refreshed when the database returns better

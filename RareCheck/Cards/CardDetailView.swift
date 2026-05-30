@@ -172,6 +172,9 @@ struct CardDetailView: View {
             showPaywall = true
             return
         }
+        guard outcome != .invalidCard else {
+            return
+        }
         isSaved = true
     }
 
