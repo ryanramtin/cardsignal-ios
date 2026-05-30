@@ -18,6 +18,7 @@ final class CameraViewModel: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     private var videoOutput: AVCaptureVideoDataOutput?
     private var cameraDevice: AVCaptureDevice?
+    private var configuredMaxPhotoDimensions: CMVideoDimensions?
     private var shouldStartAfterConfiguration = false
 
     // Stored nonisolated so the video-queue delegate can call it without
@@ -65,7 +66,10 @@ final class CameraViewModel: NSObject, ObservableObject {
         if session.canAddInput(input) { session.addInput(input) }
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
-            photoOutput.isHighResolutionCaptureEnabled = true
+            if let dimensions = preferredPhotoDimensions(for: device) {
+                photoOutput.maxPhotoDimensions = dimensions
+                configuredMaxPhotoDimensions = dimensions
+            }
             photoOutput.maxPhotoQualityPrioritization = .balanced
         }
 
@@ -127,7 +131,9 @@ final class CameraViewModel: NSObject, ObservableObject {
         isCapturing = true
         let settings = AVCapturePhotoSettings()
         settings.flashMode = .auto
-        settings.isHighResolutionPhotoEnabled = true
+        if let configuredMaxPhotoDimensions {
+            settings.maxPhotoDimensions = configuredMaxPhotoDimensions
+        }
         settings.photoQualityPrioritization = .balanced
         photoOutput.capturePhoto(with: settings, delegate: self)
     }
@@ -157,10 +163,16 @@ final class CameraViewModel: NSObject, ObservableObject {
         [photoOutput.connection(with: .video), videoOutput?.connection(with: .video)]
             .compactMap { $0 }
             .forEach { connection in
-                if connection.isVideoOrientationSupported {
-                    connection.videoOrientation = .portrait
+                if connection.isVideoRotationAngleSupported(90) {
+                    connection.videoRotationAngle = 90
                 }
             }
+    }
+
+    private func preferredPhotoDimensions(for device: AVCaptureDevice) -> CMVideoDimensions? {
+        device.activeFormat.supportedMaxPhotoDimensions.max { lhs, rhs in
+            Int64(lhs.width) * Int64(lhs.height) < Int64(rhs.width) * Int64(rhs.height)
+        }
     }
 
     private func playCaptureFeedback() {

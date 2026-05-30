@@ -754,6 +754,7 @@ final class CardScannerViewModel: ObservableObject {
     @Published var lastError: String?
     @Published var isFramed = false
     @Published var captureReadiness: CaptureReadiness = .findingEdges
+    @Published var scanGuidance: String?
 
     @Published var shouldAutoCapture = false
 
@@ -764,8 +765,10 @@ final class CardScannerViewModel: ObservableObject {
     private var stableFrameCount = 0
     private var lastDetectedFrame: DetectedCardFrame?
     private var autoCaptureArmed = true
+    private var autoCaptureCooldownUntil = Date.distantPast
     private let analysisThrottle = 1
     private let lockThreshold = 10
+    private let missRetryCooldown: TimeInterval = 2.5
 
     func analyzeFrame(_ buffer: CVPixelBuffer) {
         frameThrottle += 1
@@ -780,6 +783,7 @@ final class CardScannerViewModel: ObservableObject {
         guard !isProcessing else { return }
         isProcessing = true
         lastError = nil
+        scanGuidance = nil
         defer { isProcessing = false }
 
         do {
@@ -804,6 +808,7 @@ final class CardScannerViewModel: ObservableObject {
         guard !isProcessing else { return }
         isProcessing = true
         lastError = nil
+        scanGuidance = nil
         defer { isProcessing = false }
 
         do {
@@ -846,25 +851,35 @@ final class CardScannerViewModel: ObservableObject {
 
     func clearErrorAndResumeScanning() {
         lastError = nil
+        scanGuidance = nil
         shouldAutoCapture = false
         autoCaptureArmed = true
+        autoCaptureCooldownUntil = Date.distantPast
     }
 
     private func handleScanError(_ scanError: CardIdentificationError) {
         switch scanError {
         case .noCardDetected, .noReadableCardText:
+            scanGuidance = scanError.errorDescription
             lastError = nil
             shouldAutoCapture = false
             autoCaptureArmed = true
+            autoCaptureCooldownUntil = Date().addingTimeInterval(missRetryCooldown)
         case .noConfidentPokemonMatch:
-            lastError = scanError.errorDescription ?? "Card scan failed."
+            scanGuidance = scanError.errorDescription ?? "Hold steady until READY."
+            lastError = nil
+            shouldAutoCapture = false
+            autoCaptureArmed = true
+            autoCaptureCooldownUntil = Date().addingTimeInterval(missRetryCooldown)
         }
     }
 
     func handleLocalFirstLookupFailure(_ error: Error) {
-        lastError = CardIdentificationError.noConfidentPokemonMatch([]).errorDescription
+        scanGuidance = CardIdentificationError.noConfidentPokemonMatch([]).errorDescription
+        lastError = nil
         shouldAutoCapture = false
         autoCaptureArmed = true
+        autoCaptureCooldownUntil = Date().addingTimeInterval(missRetryCooldown)
     }
 
     func applyDetection(_ detectedFrame: DetectedCardFrame?) {
@@ -884,6 +899,9 @@ final class CardScannerViewModel: ObservableObject {
 
         isFramed = detectedFrame.isUsablyFramed
         captureReadiness = detectedFrame.captureReadiness
+        if captureReadiness == .ready {
+            scanGuidance = nil
+        }
         guard isFramed else {
             stableFrameCount = 0
             lastDetectedFrame = nil
@@ -918,6 +936,7 @@ final class CardScannerViewModel: ObservableObject {
         }
 
         guard autoCaptureArmed,
+              Date() >= autoCaptureCooldownUntil,
               !isProcessing,
               identificationResult == nil,
               lastError == nil else { return }

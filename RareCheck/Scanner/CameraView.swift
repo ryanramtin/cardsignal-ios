@@ -57,7 +57,8 @@ struct ScannerContainerView: View {
                         isCaptured: capturedPreview != nil,
                         isSearching: scannerVM.isProcessing,
                         capturePulse: capturePulse,
-                        capturedImage: capturedPreview
+                        capturedImage: capturedPreview,
+                        scanGuidance: scannerVM.scanGuidance
                     )
                 } else {
                     permissionDeniedView
@@ -180,7 +181,7 @@ struct ScannerContainerView: View {
         ContentUnavailableView {
             Label("Camera Access Required", systemImage: "camera.fill")
         } description: {
-            Text("Poke Rare Check needs camera access to scan cards.")
+            Text("PokeRareCheck needs camera access to scan cards.")
         } actions: {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -240,6 +241,7 @@ struct CardFinderOverlay: View {
     var isSearching: Bool
     var capturePulse: Bool
     var capturedImage: UIImage?
+    var scanGuidance: String?
     @State private var searchStartDate = Date()
 
     private var borderColor: Color {
@@ -257,6 +259,7 @@ struct CardFinderOverlay: View {
         if isCaptured { return "Captured - searching" }
         if isCapturing { return "Capturing now" }
         if isAutoCapturePending { return "Auto capture armed - hold steady" }
+        if let scanGuidance { return scanGuidance }
         if isLocked { return "READY - hold steady" }
         if isFramed { return captureReadiness.guidanceText }
         if isDetecting { return "Center card in frame" }
