@@ -52,6 +52,7 @@ final class CardIdentificationService: ObservableObject {
             let ms = Int(Date().timeIntervalSince(start) * 1000)
             return IdentificationResult(matches: energyMatches, source: .local, processingTimeMs: ms)
         }
+        let isLikelyEnergyCard = Self.isLikelyEnergyCardOCR(rawText: ocr.rawText, name: ocr.name)
         let hash = LocalCardIndex.shared.isFullIndexAvailable ? nil : pHashMatcher.hash(of: cardImage)
         let candidateNames = fallbackNameCandidates(from: ocr)
         let localRescueMatches = LocalCardIndex.shared.bestOCRRescueMatches(
@@ -59,6 +60,10 @@ final class CardIdentificationService: ObservableObject {
             collectorNumber: ocr.collectorNumber,
             setCode: ocr.setCode
         )
+
+        guard !isLikelyEnergyCard else {
+            throw CardIdentificationError.noConfidentPokemonMatch(candidateNames)
+        }
 
         guard !candidateNames.isEmpty else {
             throw CardIdentificationError.noReadableCardText
@@ -331,7 +336,30 @@ final class CardIdentificationService: ObservableObject {
                 return "\(splitTypeMatches[0].canonical) energy"
             }
         }
+        if lineSet.contains("basic energy") {
+            let splitTypeMatches = energyTypeAliases.filter { type in
+                type.aliases.contains { alias in lineSet.contains(alias) }
+            }
+            if splitTypeMatches.count == 1 {
+                return "\(splitTypeMatches[0].canonical) energy"
+            }
+        }
         return nil
+    }
+
+    static func isLikelyEnergyCardOCR(rawText: String, name: String?) -> Bool {
+        let lines = ([name].compactMap { $0 } + rawText.components(separatedBy: .newlines))
+            .map(normalizedCardText)
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return false }
+
+        if lines.contains("basic energy") { return true }
+        if let name = name.map(normalizedCardText),
+           name.range(of: #"^(basic )?[a-z]+ energy$"#, options: .regularExpression) != nil {
+            return true
+        }
+        let lineSet = Set(lines)
+        return lineSet.contains("basic") && lineSet.contains("energy")
     }
 
     private func cleanNameCandidate(_ value: String) -> String? {

@@ -35,6 +35,7 @@ struct ScannerContainerView: View {
     @State private var capturePulse = false
     @State private var showPaywall = false
     @State private var autoCaptureTask: Task<Void, Never>?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -70,12 +71,12 @@ struct ScannerContainerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .onAppear {
-                cameraVM.startSession()
                 cameraVM.onFrameReady = { [weak scannerVM] buffer in
                     Task { @MainActor in
                         scannerVM?.analyzeFrame(buffer)
                     }
                 }
+                cameraVM.startSession()
                 Task {
                     await cameraVM.ensureSessionRunning()
                     try? await Task.sleep(nanoseconds: 1_200_000_000)
@@ -125,6 +126,12 @@ struct ScannerContainerView: View {
                 }
             }
             .onChange(of: scannerVM.shouldAutoCapture) { _, shouldCapture in
+                guard shouldCapture else {
+                    autoCaptureTask?.cancel()
+                    autoCaptureTask = nil
+                    isAutoCapturePending = false
+                    return
+                }
                 guard shouldCapture,
                       !pendingLockedCapture,
                       !isAutoCapturePending,
@@ -136,7 +143,7 @@ struct ScannerContainerView: View {
                 isAutoCapturePending = true
                 autoCaptureTask?.cancel()
                 autoCaptureTask = Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 2_100_000_000)
+                    try? await Task.sleep(nanoseconds: 800_000_000)
                     defer { isAutoCapturePending = false }
                     guard !Task.isCancelled else { return }
                     guard scannerVM.shouldAutoCapture,
@@ -148,6 +155,11 @@ struct ScannerContainerView: View {
                         return
                     }
                     triggerCapture()
+                }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    Task { await cameraVM.ensureSessionRunning() }
                 }
             }
             .onChange(of: cameraVM.permissionGranted) { _, granted in
@@ -286,7 +298,7 @@ struct CardFinderOverlay: View {
         if isSearching { return "Matching local Pokemon DB..." }
         if isCaptured { return "Captured - matching" }
         if isCapturing { return "Capturing now" }
-        if isAutoCapturePending { return "Auto capture armed - hold steady" }
+        if isAutoCapturePending { return "READY - capturing now" }
         if let scanGuidance { return scanGuidance }
         if isLocked { return "READY - hold steady" }
         if isFramed { return captureReadiness.guidanceText }
@@ -383,7 +395,7 @@ struct CardFinderOverlay: View {
                                 .tint(.white)
                                 .controlSize(.large)
                         }
-                        Text(isCaptured ? "Captured" : "Auto capture armed")
+                        Text(isCaptured ? "Captured" : "Capturing")
                             .font(.headline.weight(.bold))
                         if !isCaptured {
                             Text("Hold steady")

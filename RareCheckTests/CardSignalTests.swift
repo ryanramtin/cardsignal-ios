@@ -382,6 +382,15 @@ final class RareCheckTests: XCTestCase {
         XCTAssertEqual(query, "lightning energy")
     }
 
+    func testBasicEnergyOCRUsesAdjacentTypeLine() {
+        let query = CardIdentificationService.energyLookupQuery(
+            rawText: "BASIC ENERGY\nWater",
+            name: nil
+        )
+
+        XCTAssertEqual(query, "water energy")
+    }
+
     func testDarkEnergyOCRMapsToDarknessEnergy() {
         let query = CardIdentificationService.energyLookupQuery(
             rawText: "Dark Energy",
@@ -398,6 +407,20 @@ final class RareCheckTests: XCTestCase {
         )
 
         XCTAssertNil(query)
+    }
+
+    func testLikelyEnergyOCRBlocksGenericPokemonRescue() {
+        XCTAssertTrue(CardIdentificationService.isLikelyEnergyCardOCR(
+            rawText: "BASIC ENERGY\nENERGY",
+            name: "Galarian Mr. Mime"
+        ))
+    }
+
+    func testPokemonAttackTextDoesNotLookLikeEnergyCard() {
+        XCTAssertFalse(CardIdentificationService.isLikelyEnergyCardOCR(
+            rawText: "Pikachu\nQuick Attack\nAttach an Energy from your hand",
+            name: "Pikachu"
+        ))
     }
 
     func testEnergyLookupReturnsOnlyRealEnergyCards() throws {
