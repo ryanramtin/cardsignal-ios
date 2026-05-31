@@ -224,7 +224,7 @@ final class RareCheckTests: XCTestCase {
         )
 
         XCTAssertFalse(viewModel.shouldAutoCapture)
-        for _ in 0..<17 {
+        for _ in 0..<(CardScannerViewModel.requiredReadyFramesForAutoCapture - 1) {
             viewModel.applyDetection(frame)
         }
 
@@ -255,7 +255,7 @@ final class RareCheckTests: XCTestCase {
             confidence: 0.92
         )
 
-        for _ in 0..<17 {
+        for _ in 0..<(CardScannerViewModel.requiredReadyFramesForAutoCapture - 1) {
             viewModel.applyDetection(frame)
         }
         viewModel.applyDetection(shiftedFrame)
@@ -272,7 +272,7 @@ final class RareCheckTests: XCTestCase {
             confidence: 0.92
         )
 
-        for _ in 0..<18 {
+        for _ in 0..<CardScannerViewModel.requiredReadyFramesForAutoCapture {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
@@ -280,13 +280,13 @@ final class RareCheckTests: XCTestCase {
         viewModel.markCaptureStarted()
         viewModel.lastError = "Try again"
         viewModel.markCaptureFinished()
-        for _ in 0..<18 {
+        for _ in 0..<CardScannerViewModel.requiredReadyFramesForAutoCapture {
             viewModel.applyDetection(frame)
         }
         XCTAssertFalse(viewModel.shouldAutoCapture)
 
         viewModel.clearErrorAndResumeScanning()
-        for _ in 0..<18 {
+        for _ in 0..<CardScannerViewModel.requiredReadyFramesForAutoCapture {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
@@ -354,7 +354,7 @@ final class RareCheckTests: XCTestCase {
             confidence: 0.92
         )
 
-        for _ in 0..<17 {
+        for _ in 0..<(CardScannerViewModel.requiredReadyFramesForAutoCapture - 1) {
             viewModel.applyDetection(frame)
         }
         viewModel.applyDetection(jitteredFrame)
@@ -400,6 +400,14 @@ final class RareCheckTests: XCTestCase {
         XCTAssertNil(query)
     }
 
+    func testEnergyLookupReturnsOnlyRealEnergyCards() throws {
+        let matches = try XCTUnwrap(LocalCardIndex.shared.energyMatches(matching: "fire energy"))
+
+        XCTAssertFalse(matches.isEmpty)
+        XCTAssertTrue(matches.allSatisfy { $0.name.localizedCaseInsensitiveContains("Energy") })
+        XCTAssertFalse(matches.contains { $0.name.localizedCaseInsensitiveContains("Energy Coin") })
+    }
+
     func testResultDismissalRearmsAutoCapture() {
         let viewModel = CardScannerViewModel()
         let frame = DetectedCardFrame(
@@ -407,7 +415,7 @@ final class RareCheckTests: XCTestCase {
             confidence: 0.92
         )
 
-        for _ in 0..<18 {
+        for _ in 0..<CardScannerViewModel.requiredReadyFramesForAutoCapture {
             viewModel.applyDetection(frame)
         }
         XCTAssertTrue(viewModel.shouldAutoCapture)
@@ -427,7 +435,7 @@ final class RareCheckTests: XCTestCase {
         XCTAssertFalse(viewModel.shouldAutoCapture)
 
         viewModel.resumeScanningAfterResultDismissal()
-        for _ in 0..<18 {
+        for _ in 0..<CardScannerViewModel.requiredReadyFramesForAutoCapture {
             viewModel.applyDetection(frame)
         }
 

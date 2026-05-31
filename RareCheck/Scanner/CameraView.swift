@@ -76,6 +76,11 @@ struct ScannerContainerView: View {
                         scannerVM?.analyzeFrame(buffer)
                     }
                 }
+                Task {
+                    await cameraVM.ensureSessionRunning()
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    await cameraVM.ensureSessionRunning()
+                }
             }
             .onDisappear {
                 autoCaptureTask?.cancel()
@@ -147,7 +152,9 @@ struct ScannerContainerView: View {
             }
             .onChange(of: cameraVM.permissionGranted) { _, granted in
                 if granted {
-                    cameraVM.startSession()
+                    Task {
+                        await cameraVM.ensureSessionRunning()
+                    }
                 }
             }
             // Surface local identification guidance so "thinking → nothing"
@@ -505,6 +512,7 @@ struct CardMatchResultSheet: View {
             } header: {
                 Text("\(result.matches.count) match\(result.matches.count == 1 ? "" : "es") found • \(ScanDurationFormatter.label(for: result))")
                     .font(.caption)
+            }
             }
             .navigationTitle("Scan Results")
             .navigationBarTitleDisplayMode(.inline)

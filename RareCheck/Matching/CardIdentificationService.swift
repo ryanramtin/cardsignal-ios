@@ -853,6 +853,8 @@ final class CardScannerViewModel: ObservableObject {
 
     @Published var shouldAutoCapture = false
 
+    nonisolated static let requiredReadyFramesForAutoCapture = 30
+
     private let identificationService = CardIdentificationService.shared
     private let persistenceController = PersistenceController.shared
 
@@ -862,7 +864,7 @@ final class CardScannerViewModel: ObservableObject {
     private var autoCaptureArmed = true
     private var autoCaptureCooldownUntil = Date.distantPast
     private let analysisThrottle = 1
-    private let lockThreshold = 18
+    private let lockThreshold = CardScannerViewModel.requiredReadyFramesForAutoCapture
     private let missRetryCooldown: TimeInterval = 1.4
 
     func analyzeFrame(_ buffer: CVPixelBuffer) {

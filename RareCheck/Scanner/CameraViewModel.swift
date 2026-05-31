@@ -133,6 +133,18 @@ final class CameraViewModel: NSObject, ObservableObject {
         }
     }
 
+    func ensureSessionRunning() async {
+        if !isPermissionResolved {
+            await checkPermission()
+        }
+        if permissionGranted && !isSessionConfigured {
+            await setupSession()
+        }
+        if permissionGranted && isSessionConfigured && !isSessionRunning && !isSessionStarting {
+            startSession()
+        }
+    }
+
     func stopSession() {
         shouldStartAfterConfiguration = false
         sessionStartGeneration += 1
