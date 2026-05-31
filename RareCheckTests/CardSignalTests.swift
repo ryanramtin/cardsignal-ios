@@ -548,6 +548,20 @@ final class RareCheckTests: XCTestCase {
         XCTAssertFalse(label.contains("0"))
     }
 
+    func testRepeatedLocalSearchStaysFastWithBundledDB() {
+        let queries = ["Bulbasaur", "Pikachu", "Charizard", "Fire Energy", "det1-1"]
+        let start = CFAbsoluteTimeGetCurrent()
+
+        for _ in 0..<20 {
+            for query in queries {
+                _ = LocalCardIndex.shared.searchCards(matching: query, limit: 8)
+            }
+        }
+
+        let elapsed = CFAbsoluteTimeGetCurrent() - start
+        XCTAssertLessThan(elapsed, 1.0, "Repeated local DB search should stay comfortably sub-second")
+    }
+
     func testFreeLimitEnforcement() {
         let controller = PersistenceController(inMemory: true)
         XCTAssertFalse(controller.isAtFreeLimit())

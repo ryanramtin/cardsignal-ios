@@ -30,7 +30,12 @@ final class CameraViewModel: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        installSessionObservers()
         Task { await checkPermission() }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Permission
@@ -155,6 +160,49 @@ final class CameraViewModel: NSObject, ObservableObject {
         Task.detached(priority: .background) {
             captureSession.stopRunning()
         }
+    }
+
+    private func installSessionObservers() {
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionDidStartRunning), name: .AVCaptureSessionDidStartRunning, object: session)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionDidStopRunning), name: .AVCaptureSessionDidStopRunning, object: session)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionRuntimeError(_:)), name: .AVCaptureSessionRuntimeError, object: session)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionWasInterrupted(_:)), name: .AVCaptureSessionWasInterrupted, object: session)
+        NotificationCenter.default.addObserver(self, selector: #selector(sessionInterruptionEnded), name: .AVCaptureSessionInterruptionEnded, object: session)
+    }
+
+    @objc private func sessionDidStartRunning() {
+        isSessionStarting = false
+        isSessionRunning = true
+    }
+
+    @objc private func sessionDidStopRunning() {
+        isSessionRunning = false
+    }
+
+    @objc private func sessionRuntimeError(_ notification: Notification) {
+        isSessionStarting = false
+        isSessionRunning = false
+        let avError = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
+
+        if avError?.code == .mediaServicesWereReset {
+            error = nil
+            Task { await ensureSessionRunning() }
+        } else {
+            error = "Camera session stopped. Reopen scan or try again in a moment."
+        }
+    }
+
+    @objc private func sessionWasInterrupted(_ notification: Notification) {
+        isSessionRunning = false
+        if let reasonValue = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int,
+           AVCaptureSession.InterruptionReason(rawValue: reasonValue) == .videoDeviceInUseByAnotherClient {
+            error = "Camera is in use by another app. Close it and try again."
+        }
+    }
+
+    @objc private func sessionInterruptionEnded() {
+        error = nil
+        Task { await ensureSessionRunning() }
     }
 
     // MARK: - Capture

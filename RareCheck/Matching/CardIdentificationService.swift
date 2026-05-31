@@ -420,7 +420,11 @@ private extension CardIdentifyResponse {
 
 final class LocalCardIndex {
     static let shared = LocalCardIndex()
-    var index: [LocalCardRecord]?
+    var index: [LocalCardRecord]? {
+        didSet { rebuildSearchCache() }
+    }
+    private var searchableRecords: [SearchableLocalCardRecord] = []
+    private var exactLookup: [String: [SearchableLocalCardRecord]] = [:]
 
     private enum Source {
         case none
@@ -503,28 +507,22 @@ final class LocalCardIndex {
 
     func searchCards(matching query: String, limit: Int = 80) -> [CardMatch] {
         let normalizedQuery = Self.normalizedSearchText(query)
-        guard !normalizedQuery.isEmpty, let index else { return [] }
+        guard !normalizedQuery.isEmpty, !searchableRecords.isEmpty else { return [] }
         let terms = normalizedQuery.split(separator: " ").map(String.init)
+        let candidateRecords = exactLookup[normalizedQuery] ?? searchableRecords
 
-        return index
+        return candidateRecords
             .compactMap { record -> (record: LocalCardRecord, score: Int)? in
-                let name = Self.normalizedSearchText(record.name)
-                let set = Self.normalizedSearchText(record.setName)
-                let number = Self.normalizedSearchText(record.collectorNumber)
-                let code = Self.normalizedSearchText(record.setCode)
-                let id = Self.normalizedSearchText(record.id)
-                let haystack = "\(id) \(name) \(set) \(number) \(code)"
-
-                guard terms.allSatisfy({ haystack.contains($0) }) else { return nil }
+                guard terms.allSatisfy({ record.haystack.contains($0) }) else { return nil }
 
                 var score = 0
-                if id == normalizedQuery { score += 120 }
-                if name == normalizedQuery { score += 100 }
-                if name.hasPrefix(normalizedQuery) { score += 60 }
-                if name.contains(normalizedQuery) { score += 35 }
-                if number == normalizedQuery || code == normalizedQuery { score += 30 }
-                score += max(0, 20 - name.count / 4)
-                return (record, score)
+                if record.id == normalizedQuery { score += 120 }
+                if record.name == normalizedQuery { score += 100 }
+                if record.name.hasPrefix(normalizedQuery) { score += 60 }
+                if record.name.contains(normalizedQuery) { score += 35 }
+                if record.collectorNumber == normalizedQuery || record.setCode == normalizedQuery { score += 30 }
+                score += max(0, 20 - record.name.count / 4)
+                return (record.raw, score)
             }
             .sorted {
                 if $0.score == $1.score { return $0.record.name < $1.record.name }
@@ -718,6 +716,32 @@ final class LocalCardIndex {
         guard overlap > 0 else { return 0 }
         return min(0.36 + Double(overlap) * 0.08, 0.52)
     }
+
+    private func rebuildSearchCache() {
+        searchableRecords = (index ?? []).map { record in
+            let id = Self.normalizedSearchText(record.id)
+            let name = Self.normalizedSearchText(record.name)
+            let setName = Self.normalizedSearchText(record.setName)
+            let collectorNumber = Self.normalizedSearchText(record.collectorNumber)
+            let setCode = Self.normalizedSearchText(record.setCode)
+            return SearchableLocalCardRecord(
+                raw: record,
+                id: id,
+                name: name,
+                setName: setName,
+                collectorNumber: collectorNumber,
+                setCode: setCode,
+                haystack: "\(id) \(name) \(setName) \(collectorNumber) \(setCode)"
+            )
+        }
+        var lookup: [String: [SearchableLocalCardRecord]] = [:]
+        for record in searchableRecords {
+            [record.id, record.name, record.collectorNumber, record.setCode]
+                .filter { !$0.isEmpty }
+                .forEach { lookup[$0, default: []].append(record) }
+        }
+        exactLookup = lookup
+    }
 }
 
 struct LocalCardRecord: Codable {
@@ -730,6 +754,16 @@ struct LocalCardRecord: Codable {
     let imageURL: String
     let pHash: UInt64?
     let lastKnownPrice: PriceData?
+}
+
+private struct SearchableLocalCardRecord {
+    let raw: LocalCardRecord
+    let id: String
+    let name: String
+    let setName: String
+    let collectorNumber: String
+    let setCode: String
+    let haystack: String
 }
 
 private struct PokemonTCGIndexClient {
