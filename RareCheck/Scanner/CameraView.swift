@@ -110,7 +110,7 @@ struct ScannerContainerView: View {
                             capturePulse = true
                         }
                     }
-                    try? await Task.sleep(nanoseconds: 180_000_000)
+                    try? await Task.sleep(nanoseconds: 700_000_000)
                     await MainActor.run {
                         withAnimation(.easeOut(duration: 0.2)) { capturePulse = false }
                     }
@@ -171,6 +171,8 @@ struct ScannerContainerView: View {
                         showPaywall = true
                     } else if outcome == .invalidCard {
                         scannerVM.lastError = "Scan result was incomplete. Try scanning again."
+                    } else if outcome == .saveFailed {
+                        scannerVM.lastError = "Card could not be saved. Try again."
                     } else {
                         appNavigation.showCollection(for: card.name, outcome: outcome)
                     }
@@ -281,8 +283,8 @@ struct CardFinderOverlay: View {
     }
 
     private var statusText: String {
-        if isSearching { return "Searching Pokemon database..." }
-        if isCaptured { return "Captured - searching" }
+        if isSearching { return "Matching local Pokemon DB..." }
+        if isCaptured { return "Captured - matching" }
         if isCapturing { return "Capturing now" }
         if isAutoCapturePending { return "Auto capture armed - hold steady" }
         if let scanGuidance { return scanGuidance }
@@ -360,7 +362,7 @@ struct CardFinderOverlay: View {
                 if isSearching {
                     HStack(spacing: 6) {
                         RotatingPokeballView()
-                        Text("Pokemon DB")
+                        Text("Local Pokemon DB")
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundStyle(.white)
@@ -429,7 +431,7 @@ struct CardFinderOverlay: View {
             TimelineView(.periodic(from: .now, by: 0.5)) { context in
                 HStack(spacing: 8) {
                     RotatingPokeballView()
-                    Text("Searching Pokemon DB \(max(1, Int(ceil(context.date.timeIntervalSince(searchStartDate)))))s")
+                    Text("Matching local DB \(max(1, Int(ceil(context.date.timeIntervalSince(searchStartDate)))))s")
                 }
             }
         } else {

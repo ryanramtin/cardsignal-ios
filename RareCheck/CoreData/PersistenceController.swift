@@ -12,6 +12,7 @@ final class PersistenceController: ObservableObject {
         case updated
         case limitReached
         case invalidCard
+        case saveFailed
     }
 
     let container: NSPersistentContainer
@@ -66,7 +67,7 @@ final class PersistenceController: ObservableObject {
         fetchRequest.predicate = NSPredicate(format: "cardId == %@", card.id)
         if let existing = try? ctx.fetch(fetchRequest), let saved = existing.first {
             apply(card, to: saved, preserveAddedAt: false)
-            try? ctx.save()
+            guard saveContext(ctx) else { return .saveFailed }
             return .updated
         }
 
@@ -82,8 +83,19 @@ final class PersistenceController: ObservableObject {
         apply(card, to: saved, preserveAddedAt: false)
         saved.addedAt = Date()
 
-        try? ctx.save()
+        guard saveContext(ctx) else { return .saveFailed }
         return .inserted
+    }
+
+    private func saveContext(_ ctx: NSManagedObjectContext) -> Bool {
+        do {
+            try ctx.save()
+            return true
+        } catch {
+            print("[RareCheck] CoreData save failed: \(error)")
+            ctx.rollback()
+            return false
+        }
     }
 
     private func apply(_ card: CardMatch, to saved: SavedCard, preserveAddedAt: Bool) {

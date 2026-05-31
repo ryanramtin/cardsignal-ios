@@ -23,6 +23,8 @@ final class AppNavigationState: ObservableObject {
                 return "Upgrade to Pro to save more than \(PersistenceController.freeCollectionLimit) cards"
             case .invalidCard:
                 return "Scan result was incomplete. Try scanning again."
+            case .saveFailed:
+                return "Card could not be saved. Try again."
             }
         }
     }

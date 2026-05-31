@@ -175,6 +175,9 @@ struct CardDetailView: View {
         guard outcome != .invalidCard else {
             return
         }
+        guard outcome != .saveFailed else {
+            return
+        }
         isSaved = true
     }
 
